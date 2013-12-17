@@ -42,7 +42,8 @@ class CodeGen(ast.NodeVisitor):
         self.names     = make_table()
         self.varnames  = make_table()
 
-    of = ast.NodeVisitor.visit
+    def of(self, t):
+        return self.visits(t) if isinstance(t, list) else self.visit(t)
 
     def compile(self, t):
         bytecode = (self.of(t)
@@ -51,7 +52,7 @@ class CodeGen(ast.NodeVisitor):
         kwonlyargcount = 0
         nlocals = 0
         stacksize = 10          # XXX
-        flags = 67
+        flags = 2 # meaning: newlocals
         filename = '<stdin>'
         name = 'the_name'
         firstlineno = 1
@@ -67,16 +68,30 @@ class CodeGen(ast.NodeVisitor):
     def visits(self, nodes):
         return b''.join(map(self.of, nodes))
 
+    def load_const(self, constant):
+        return op.LOAD_CONST(self.constants[constant])
+
+    def store(self, name):
+#XXX        return op.STORE_NAME(self.names[name])
+        return op.STORE_GLOBAL(self.names[name])
+
     def visit_Module(self, t):
-        return self.visits(t.body)
+        return self.of(t.body)
+
+    def visit_FunctionDef(self, t):
+        assert not t.args.args
+        assert not t.decorator_list
+        code = CodeGen().compile(t.body)
+        name = self.names[t.name]
+        return self.load_const(code) + op.MAKE_FUNCTION(0) + self.store(t.name)
 
     def visit_If(self, t):
-        orelse = self.visits(t.orelse)
-        body = self.visits(t.body) + op.JUMP_FORWARD(len(orelse))
+        orelse = self.of(t.orelse)
+        body = self.of(t.body) + op.JUMP_FORWARD(len(orelse))
         return self.of(t.test) + op.POP_JUMP_IF_FALSE(len(body)) + body + orelse
 
     def visit_While(self, t):
-        test, body = self.of(t.test), self.visits(t.body)
+        test, body = self.of(t.test), self.of(t.body)
         branch = op.POP_JUMP_IF_FALSE(len(body)+3)
         inside = test + branch + body
         loop = inside + op.JUMP_BACK(len(inside))
@@ -87,11 +102,10 @@ class CodeGen(ast.NodeVisitor):
 
     def visit_Assign(self, t):
         assert 1 == len(t.targets) and isinstance(t.targets[0], ast.Name)
-        name = self.names[t.targets[0].id]
-        return self.of(t.value) + op.DUP_TOP + op.STORE_GLOBAL(name)
+        return self.of(t.value) + op.DUP_TOP + self.store(t.targets[0].id)
 
     def visit_Call(self, t):
-        return self.of(t.func) + self.visits(t.args) + op.CALL_FUNCTION(len(t.args))
+        return self.of(t.func) + self.of(t.args) + op.CALL_FUNCTION(len(t.args))
 
     def visit_BinOp(self, t):
         return self.of(t.left) + self.of(t.right) + self.ops2[type(t.op)]
@@ -133,10 +147,12 @@ def collect(table):
 if __name__ == '__main__':
     eg_ast = ast.parse("""
 a = 2+3
-while a:
-    if a - 1:
-        print(a, 137)
-    a = a - 1
+def f():
+    while a:
+        if a - 1:
+            print(a, 137)
+        a = a - 1
+f()
 print(pow(2, 16))
 """)
     try:
