@@ -29,6 +29,20 @@ for name, opcode in dis.opmap.items():
             bytes((opcode,)) if opcode < dis.HAVE_ARGUMENT else take_arg(opcode))
 op.JUMP_BACK = take_arg(255)    # A fake opcode for our internal use.
 
+def fix_jumps(bytecode):
+    i, result = 0, list(bytecode)
+    while i < len(bytecode):
+        opcode = bytecode[i]
+        if opcode in dis.hasjabs:
+            target = i + 3 + bytecode[i+1] + 256 * bytecode[i+2]
+            result[i+1], result[i+2] = target % 256, target // 256
+        elif opcode == 255:   # op.JUMP_BACK
+            target = i - (bytecode[i+1] + 256 * bytecode[i+2])
+            result[i] = dis.opmap['JUMP_ABSOLUTE']
+            result[i+1], result[i+2] = target % 256, target // 256
+        i += 1 if opcode < dis.HAVE_ARGUMENT else 3
+    return bytes(result)
+
 def bytecomp(t, f_globals):
     return types.FunctionType(CodeGen().compile(t), f_globals)
 
@@ -122,20 +136,6 @@ class CodeGen(ast.NodeVisitor):
 
     def visit_Name(self, t):
         return op.LOAD_GLOBAL(self.names[t.id])  # XXX LOAD_NAME in general
-
-def fix_jumps(bytecode):
-    i, result = 0, list(bytecode)
-    while i < len(bytecode):
-        opcode = bytecode[i]
-        if opcode in dis.hasjabs:
-            target = i + 3 + bytecode[i+1] + 256 * bytecode[i+2]
-            result[i+1], result[i+2] = target % 256, target // 256
-        elif opcode == 255:   # op.JUMP_BACK
-            target = i - (bytecode[i+1] + 256 * bytecode[i+2])
-            result[i] = dis.opmap['JUMP_ABSOLUTE']
-            result[i+1], result[i+2] = target % 256, target // 256
-        i += 1 if opcode < dis.HAVE_ARGUMENT else 3
-    return bytes(result)
 
 def make_table():
     table = collections.defaultdict(lambda: len(table))
