@@ -46,8 +46,7 @@ class CodeGen(ast.NodeVisitor):
         return self.compile(body)
 
     def compile(self, t):
-        bytecode = (self.of(t)
-                    + op.LOAD_CONST(self.constants[None]) + op.RETURN_VALUE)
+        bytecode = self.of(t) + self.load_const(None) + op.RETURN_VALUE
         argcount = 0
         kwonlyargcount = 0
         nlocals = 0
