@@ -20,10 +20,11 @@ So how should we do this? Some possibilities:
 
 import ast, collections, dis, types
 
+def take_arg(opcode): return lambda arg: bytes(encode(opcode, arg))
+def encode(opcode, arg): return [opcode, arg % 256, arg // 256]
+
 class Opcodes: pass
 op = Opcodes()
-def take_arg(opcode):
-    return lambda arg: bytes((opcode, arg % 256, arg // 256))
 for name, opcode in dis.opmap.items():
     setattr(op, name,
             bytes((opcode,)) if opcode < dis.HAVE_ARGUMENT else take_arg(opcode))
@@ -35,11 +36,10 @@ def fix_jumps(bytecode):
         opcode = bytecode[i]
         if opcode in dis.hasjabs:
             target = i + 3 + bytecode[i+1] + 256 * bytecode[i+2]
-            result[i+1], result[i+2] = target % 256, target // 256
-        elif opcode == 255:   # op.JUMP_BACK
+            result[i:i+3] = encode(opcode, target)
+        elif opcode == 255:     # op.JUMP_BACK
             target = i - (bytecode[i+1] + 256 * bytecode[i+2])
-            result[i] = dis.opmap['JUMP_ABSOLUTE']
-            result[i+1], result[i+2] = target % 256, target // 256
+            result[i:i+3] = encode(dis.opmap['JUMP_ABSOLUTE'], target)
         i += 1 if opcode < dis.HAVE_ARGUMENT else 3
     return bytes(result)
 
