@@ -39,6 +39,12 @@ class CodeGen(ast.NodeVisitor):
         self.names     = make_table()
         self.varnames  = make_table()
 
+    def compile_body(self, body):
+        t = body[0]
+        doc_comment = t.value if isinstance(t, ast.Expr) and isinstance(t.value, ast.Str) else None
+        self.constants[doc_comment] # The doc comment is the constant table's first entry.
+        return self.compile(body)
+
     def compile(self, t):
         bytecode = (self.of(t)
                     + op.LOAD_CONST(self.constants[None]) + op.RETURN_VALUE)
@@ -78,7 +84,7 @@ class CodeGen(ast.NodeVisitor):
     def visit_FunctionDef(self, t):
         assert not t.args.args
         assert not t.decorator_list
-        code = CodeGen().compile(t.body)
+        code = CodeGen().compile_body(t.body)
         return self.load_const(code) + op.MAKE_FUNCTION(0) + self.store(t.name)
 
     def visit_If(self, t):
