@@ -65,7 +65,7 @@ class CodeGen(ast.NodeVisitor):
         kwonlyargcount = 0
         nlocals = 0
         stacksize = 10          # XXX
-        flags = 2 # meaning: newlocals
+        flags = 64  # XXX I don't understand the flags
         filename = '<stdin>'
         name = 'the_name'
         firstlineno = 1
@@ -85,8 +85,7 @@ class CodeGen(ast.NodeVisitor):
         return op.LOAD_CONST(self.constants[constant])
 
     def store(self, name):
-#XXX        return op.STORE_NAME(self.names[name])
-        return op.STORE_GLOBAL(self.names[name])
+        return op.STORE_NAME(self.names[name])
 
     def visit_Module(self, t):
         return self.of(t.body)
@@ -135,7 +134,7 @@ class CodeGen(ast.NodeVisitor):
         return self.load_const(t.s)
 
     def visit_Name(self, t):
-        return op.LOAD_GLOBAL(self.names[t.id])  # XXX LOAD_NAME in general
+        return op.LOAD_NAME(self.names[t.id])
 
 def make_table():
     table = collections.defaultdict(lambda: len(table))
