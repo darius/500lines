@@ -115,6 +115,9 @@ class CodeGen(ast.NodeVisitor):
     def visit_Num(self, t):
         return op.LOAD_CONST(self.constants[t.n])
 
+    def visit_Str(self, t):
+        return op.LOAD_CONST(self.constants[t.s])
+
     def visit_Name(self, t):
         return op.LOAD_GLOBAL(self.names[t.id])  # XXX LOAD_NAME in general
 
@@ -144,6 +147,7 @@ if __name__ == '__main__':
     eg_ast = ast.parse("""
 a = 2+3
 def f():
+    "doc comment"
     while a:
         if a - 1:
             print(a, 137)
