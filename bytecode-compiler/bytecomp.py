@@ -18,22 +18,19 @@ So how should we do this? Some possibilities:
     of code, and to be less declarative but more pythonic.
 """
 
-import ast
-from collections import defaultdict
-from dis import dis, opmap, HAVE_ARGUMENT
-from types import CodeType, FunctionType
+import ast, collections, dis, types
 
 class Opcodes: pass
 op = Opcodes()
 def take_arg(opcode):
     return lambda arg: bytes((opcode, arg % 256, arg // 256))
-for name, opcode in opmap.items():
+for name, opcode in dis.opmap.items():
     setattr(op, name,
-            bytes((opcode,)) if opcode < HAVE_ARGUMENT else take_arg(opcode))
+            bytes((opcode,)) if opcode < dis.HAVE_ARGUMENT else take_arg(opcode))
 op.JUMP_BACK = take_arg(255)    # A fake opcode for our internal use.
 
-def bytecomp(node, f_globals):
-    return FunctionType(CodeGen().compile(node), f_globals)
+def bytecomp(t, f_globals):
+    return types.FunctionType(CodeGen().compile(t), f_globals)
 
 class CodeGen(ast.NodeVisitor):
 
@@ -41,9 +38,6 @@ class CodeGen(ast.NodeVisitor):
         self.constants = make_table()
         self.names     = make_table()
         self.varnames  = make_table()
-
-    def of(self, t):
-        return self.visits(t) if isinstance(t, list) else self.visit(t)
 
     def compile(self, t):
         bytecode = (self.of(t)
@@ -57,13 +51,16 @@ class CodeGen(ast.NodeVisitor):
         name = 'the_name'
         firstlineno = 1
         lnotab = b''
-        return CodeType(argcount, kwonlyargcount, nlocals, stacksize, flags,
-                        fix_jumps(bytecode),
-                        collect(self.constants),
-                        collect(self.names),
-                        collect(self.varnames),
-                        filename, name, firstlineno, lnotab,
-                        freevars=(), cellvars=())
+        return types.CodeType(argcount, kwonlyargcount, nlocals, stacksize, flags,
+                              fix_jumps(bytecode),
+                              collect(self.constants),
+                              collect(self.names),
+                              collect(self.varnames),
+                              filename, name, firstlineno, lnotab,
+                              freevars=(), cellvars=())
+
+    def of(self, t):
+        return self.visits(t) if isinstance(t, list) else self.visit(t)
 
     def visits(self, nodes):
         return b''.join(map(self.of, nodes))
@@ -82,7 +79,6 @@ class CodeGen(ast.NodeVisitor):
         assert not t.args.args
         assert not t.decorator_list
         code = CodeGen().compile(t.body)
-        name = self.names[t.name]
         return self.load_const(code) + op.MAKE_FUNCTION(0) + self.store(t.name)
 
     def visit_If(self, t):
@@ -126,18 +122,18 @@ def fix_jumps(bytecode):
     i, result = 0, list(bytecode)
     while i < len(bytecode):
         opcode = bytecode[i]
-        if opcode == opmap['POP_JUMP_IF_FALSE']:
+        if opcode in dis.hasjabs:
             target = i + 3 + bytecode[i+1] + 256 * bytecode[i+2]
             result[i+1], result[i+2] = target % 256, target // 256
         elif opcode == 255:   # op.JUMP_BACK
             target = i - (bytecode[i+1] + 256 * bytecode[i+2])
-            result[i] = opmap['JUMP_ABSOLUTE']
+            result[i] = dis.opmap['JUMP_ABSOLUTE']
             result[i+1], result[i+2] = target % 256, target // 256
-        i += 1 if opcode < HAVE_ARGUMENT else 3
+        i += 1 if opcode < dis.HAVE_ARGUMENT else 3
     return bytes(result)
 
 def make_table():
-    table = defaultdict(lambda: len(table))
+    table = collections.defaultdict(lambda: len(table))
     return table
 
 def collect(table):
@@ -161,5 +157,5 @@ print(pow(2, 16))
         astpp = ast
     print(astpp.dump(eg_ast))
     f = bytecomp(eg_ast, globals())
-    dis(f)
+    dis.dis(f)
     f()   # It's alive!
