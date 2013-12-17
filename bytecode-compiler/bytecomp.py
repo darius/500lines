@@ -144,6 +144,15 @@ def collect(table):
 
 
 if __name__ == '__main__':
+
+    def diss(code):
+        dis.dis(code)
+        for c in code.co_consts:
+            if isinstance(c, types.CodeType):
+                print()
+                print('------', c, '------')
+                diss(c)
+
     eg_ast = ast.parse("""
 a = 2+3
 def f():
@@ -161,5 +170,5 @@ print(pow(2, 16))
         astpp = ast
     print(astpp.dump(eg_ast))
     f = bytecomp(eg_ast, globals())
-    dis.dis(f)
+    diss(f.__code__)
     f()   # It's alive!
