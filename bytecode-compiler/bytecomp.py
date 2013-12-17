@@ -119,10 +119,10 @@ class CodeGen(ast.NodeVisitor):
             ast.BitAnd: op.BINARY_AND,      ast.FloorDiv: op.BINARY_FLOOR_DIVIDE}
 
     def visit_Num(self, t):
-        return op.LOAD_CONST(self.constants[t.n])
+        return self.load_const(t.n)
 
     def visit_Str(self, t):
-        return op.LOAD_CONST(self.constants[t.s])
+        return self.load_const(t.s)
 
     def visit_Name(self, t):
         return op.LOAD_GLOBAL(self.names[t.id])  # XXX LOAD_NAME in general
