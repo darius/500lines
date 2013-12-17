@@ -41,8 +41,8 @@ class CodeGen(ast.NodeVisitor):
 
     def compile_body(self, body):
         t = body[0]
-        doc_comment = t.value if isinstance(t, ast.Expr) and isinstance(t.value, ast.Str) else None
-        self.constants[doc_comment] # The doc comment is the constant table's first entry.
+        if not (isinstance(t, ast.Expr) and isinstance(t.value, ast.Str)):
+            self.constants[None] # The doc comment starts the constant table.
         return self.compile(body)
 
     def compile(self, t):
