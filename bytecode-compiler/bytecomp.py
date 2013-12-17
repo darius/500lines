@@ -65,10 +65,7 @@ class CodeGen(ast.NodeVisitor):
                               freevars=(), cellvars=())
 
     def of(self, t):
-        return self.visits(t) if isinstance(t, list) else self.visit(t)
-
-    def visits(self, nodes):
-        return b''.join(map(self.of, nodes))
+        return b''.join(map(self.of, t)) if isinstance(t, list) else self.visit(t)
 
     def load_const(self, constant):
         return op.LOAD_CONST(self.constants[constant])
