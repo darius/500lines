@@ -20,56 +20,33 @@ one?
 http://en.wikipedia.org/wiki/Principles_of_Compiler_Design#mediaviewer/File:Green_Dragon_Book_%28front%29.jpg
 Of course, there's copyright, besides it being kind of a distraction.]
 
-To resolve the riddle, let's make a self-reliant genie---I mean, a
+In this chapter, we will make a self-reliant genie---that is, a
 small compiler able to compile itself. We'll write it in and for a
-subset of Python 3, adequate to clear, direct coding without demanding
-too much to implement. The result---call it Tailbiter---will be a toy,
+subset of Python 3. The result---call it Tailbiter---will be a toy,
 but less of a toy than usual in an introduction: besides the
 self-compiling, it'll include some details of debugging support. To
-make room for these emphases, let's drop the whole topic of
-optimization---in plainer terms, of making the output code less
+make room for these emphases, we will ignore the topic of
+optimization---or, in plainer terms, of making the output code less
 stupid.
 
-When we're done we'll find it all to be done with no trick, no
-powerful new principle: you'll need to be comfortable with recursion
-over a tree, with nested functions, and with reading a program
+All you'll need to follow along is comfort with recursion
+over a tree, nested functions, and reading a program
 dependent on some built-in Python libraries and types that I'll survey
 but not delve into.
 
-[XXX Just drop the above paragraph, I think. Older thoughts: Drop the
-mention of nested functions? I'm afraid it might scare people away who
-could get something out of this. But I don't want to overpromise
-accessibility either, not after the cries of despair over Udacity
-CS212. A similar potential hurdle is this being just generally more
-tightly coded than some are used to, like CS212 again. I'd like to
-acknowledge that reading code isn't easy---note how I already implied
-thinking my code is "clear and direct", how conceited---and encourage
-readers anyway. Implying it's clear and simple, when it's at least
-intricate and likely difficult, gets offputting. Warning that it's all
-elite and stuff is also offputting. Help? I guess the smallest change
-is from "adequate to clear, direct coding" to "adequate to code in". A
-pity to make it blander that way. Blah, overthinking!]
+So, where do we start? 
 
-This chapter's goal of self-hosting escapes a textbook's core concerns
-of generating smarter code, for more language features, with more
-useful errors. Thus it's understandable when most textbooks don't
-spell out a self-hosting compiler: instead you may get a smaller toy
-in the first chapter, then many intricate chapters on each piece of
-the full-scale ones used by hundreds of thousands of programmers. You
-might well start with the smaller toy; but in between such and the
-likes of Clang and GCC, a simple real compiler like Python's can offer
-engineering lessons too---and I'll try to model some of them in
-miniature. Most of all, I want to show a real(ish) compiler as just
-another program you can read and mess with.
+When I began this project, I knew quite a bit about how to write a compiler,
+but not very much about the Python virtual machine which we're targeting. Right
+away I hit the first snag the textbooks don't talk about: inadequate
+documentation. 
 
-When I began, I knew about compilers but not the Python virtual
-machine which we're targeting. Right away I hit the first snag the
-textbooks don't show you: inadequate documentation. We'll respond by
-building in stages, from a seed just capable of turning the simplest
-source code into working bytecode, learning from each stage how to
-grow into the next. Start with an example of our input and our output:
-a trivial program, from its source text to parsed syntax and then to
-runnable bytecode.
+We'll respond to this challenge by building in stages, from a seed just capable of
+turning the simplest source code into working bytecode, learning from each
+stage how to grow into the next. Start with an example of our input and our
+output: a trivial program, from its source text to parsed syntax and then to
+runnable bytecode. This technique of 'growing' your program in small stages is
+a useful one when working in an uncertain domain. 
 
 
 ## The input: an abstract syntax tree
@@ -101,7 +78,7 @@ chapter we let Python's `ast.parse` produce it for us.
           ], keywords=[], starargs=None, kwargs=None, lineno=2, col_offset=0), lineno=2, col_offset=0),
       ])
 
-So the module becomes an `ast.Module` whose `body` is a list of more
+We get an `ast.Module` whose `body` is a list of more
 of these `ast` objects---in this case two, an `ast.Assign`
 representing `name = 'Chrysophylax'` and an `ast.Expr` representing the call
 to `print`---each of these being built out of further `ast` objects: a
@@ -110,24 +87,23 @@ tree of them. Each object has fields proper to its type, plus a
 text it was parsed from. We'll sweat these details more when we get to
 them.
 
-You can find all the AST classes and their fields in
-`Parser/Python.asdl` in the Python 3 source distribution. As it's 100+
-lines long, with roughly one line per class, if we'll need to handle a
-fair fraction of the types then we can forecast a budget of only a few
-lines of code per type.
+You can find all the AST classes and their fields in `Parser/Python.asdl` in
+the Python 3 source distribution. It's 100+ lines long, with roughly one line
+per class; we'll need to handle a fair fraction of them to achieve our goal of
+a self-hosting compiler.
 
 
 ## The output: bytecode
 
 Compiling the module (with Python's built-in compiler, for now)
-gets us a code object, an internal Python type:
+yields a code object, which is an internal Python type:
 
     # in transcripts:
     >>> module_code = compile(module_ast, 'greet.py', 'exec')
     >>> module_code
     <code object <module> at 0xffdd76b0, file "greet.py", line 1>
 
-It has a bunch of attributes named starting with `co_`:
+It has a bunch of attributes prefixed with `co_`:
 
     # in examples:
     co_argcount       0
@@ -147,8 +123,7 @@ It has a bunch of attributes named starting with `co_`:
     co_varnames       ()
 
 What happened to our program? Mostly it's encoded into `co_code`: a
-sequence of bytecodes in a bytestring[^1]. Disassembly renders the
-meaning, using `dis.dis`:
+sequence of bytecodes in a bytestring[^1]. We can reveal the meaning of these bytecodes through disassembly, using `dis.dis`:
 
     # in transcripts:
     >>> dis.dis(module_code)
@@ -237,6 +212,10 @@ compatible within a major version, like Python 3.*x*.)
 
 ### A symbolic assembly form
 
+Now that we've defined our problem a bit better, we can take our first step:
+building a compiler that can compile `greet.py`. We will do this by somehow
+translating the ast produced by `greet.py` into bytecode.
+
 To create the code object we saw above, it'd help to be able to write
 Python code that resembles the disassembly. Like this:
 
@@ -275,6 +254,14 @@ we can build our code in pieces to be strung together, like
  
 which produces the same bytecode: it doesn't matter how we chunk the
 assembly.
+
+[Debo NOTE: This is bad]
+There are a couple of reasons why this intermediate _assembly language_ is a
+useful place to start our program. Since the bytecode specification is a source
+of major uncertainty for us, this layer isolates our tinkering with the
+bytecode to a very specific place in our program. Since the bytecode
+specification also changes more often than the ast spec does, this also
+provides us with an 'insulating layer' between these two concerns.
 
 A higher-level assembly language could've been made where instead of
 `op.LOAD_CONST(0)` this example would say `op.LOAD_CONST('Chrysophylax')`,
