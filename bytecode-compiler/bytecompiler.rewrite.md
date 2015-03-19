@@ -46,7 +46,7 @@ turning the simplest source code into working bytecode, learning from each
 stage how to grow into the next. Start with an example of our input and our
 output: a trivial program, from its source text to parsed syntax and then to
 runnable bytecode. This technique of 'growing' your program in small stages is
-a useful one when working in an uncertain domain. 
+useful when working in an uncertain domain. 
 
 
 ## The input: an abstract syntax tree
@@ -203,11 +203,10 @@ structure into a sequence of instructions to perform the operations in
 the right order. Each subtree of the parse tree turned into a
 subsequence of the instructions.
 
-The bytecode we just saw was specific to CPython 3.4; in other
-versions of Python the bytecode varies, maybe even for this tiny
-example. The code produced by Tailbiter is meant for CPython 3.4 only,
-and might crash other interpreters. (ASTs on the other hand are mostly
-compatible within a major version, like Python 3.*x*.)
+The bytecode we just saw was specific to CPython 3.4; in other versions of
+Python the bytecode varies, maybe even for this tiny example. The code produced
+by Tailbiter is meant for CPython 3.4 only, and might crash other interpreters.
+ASTs are mostly compatible within a major version, like Python 3.*x*.
 
 
 ### A symbolic assembly form
@@ -255,13 +254,13 @@ we can build our code in pieces to be strung together, like
 which produces the same bytecode: it doesn't matter how we chunk the
 assembly.
 
-[Debo NOTE: This is bad]
-There are a couple of reasons why this intermediate _assembly language_ is a
-useful place to start our program. Since the bytecode specification is a source
-of major uncertainty for us, this layer isolates our tinkering with the
-bytecode to a very specific place in our program. Since the bytecode
-specification also changes more often than the ast spec does, this also
-provides us with an 'insulating layer' between these two concerns.
+There are a couple of reasons why this intermediate _assembly
+language_ is a useful place to start building our program. Since the
+bytecode specification is a source of major uncertainty for us, this
+layer isolates our tinkering with the bytecode to a very specific
+place in our program. Since the bytecode specification also changes
+more often than the ast spec does, this also provides us with an
+'insulating layer' between these two problem domains.
 
 A higher-level assembly language could've been made where instead of
 `op.LOAD_CONST(0)` this example would say `op.LOAD_CONST('Chrysophylax')`,
@@ -276,14 +275,10 @@ integers, more so than for the assembler.
 
 ## The seed: a 'hello world' compiler
 
-We want to build a code object, but I haven't documented all the
-details that go into one. Neither did Python! We get to learn them by
-studying the system source code and trying things out. I would rather
-have read the source *after* writing my own, for the sake of fuller
-learning: it's curious how much smarter systems turn out when studied
-in that order. But I'd get stumped by the occasionally-outdated and
-more-often sketchy docs on the virtual machine and the code object, or
-by the code in `ceval.c`.
+We want to build a code object, but we don't know all the details that
+go into one. To face these uncertainties and start learning, let's
+make a complete working system for a tiny core subset of the problem:
+just enough to run our `greet.py`.
 
     # in figure 0: AST types understood by Tailbiter version 0.
     mod = Module(stmt* body)
@@ -298,20 +293,24 @@ by the code in `ceval.c`.
     expr_context = Load | Store
     keyword = (identifier arg, expr value)
 
-To face these uncertainties and start learning, let's make a complete
-working system for a tiny core subset of the problem: just enough to
-run our `greet.py`. (This staging may shore up my explanations the
-same way it helped me learn: if it comes to clearing up doubtful
-points by poking at the actual running code, it's easiest when it's
-smallest.) Figure 0 lists the AST classes we'll need to handle, and
+Figure 0 lists the AST classes we'll need to handle, and
 their fields. The second line, for instance, means that one type of
 statement is `ast.Assign`, which has a list of target expressions (the
 `*` means a list) and a value expression. This represents statements
-like `x = y = 2+3`, with `x` and `y` as targets. Python uses a tool to
-generate all of the AST classes from these declarations---it's another
-tiny compiler of a sort---though to us they're just documentation. (In
-some of the cases, like `Call`, full Python includes more fields which
-I've left out.)
+like `x = y = 2+3`, with `x` and `y` as targets. 
+
+Python uses a tool to generate all of the AST classes from these
+declarations---it's another tiny compiler of a sort---though to us
+they're just documentation. 
+
+Here is the whole compiler as a 'literate program': a part in angle
+brackets stands for more code we'll see later. When we do, we'll show
+it starting with `# in the assembler:`. This chapter will get to two
+later, fancier versions of the same compiler, and they'll sometimes
+use chunks like `# in the assembler v1:` (replacing the earlier
+version, `v0`) and `# in CodeGen methods v1+:` (appearing in `v1` and
+also `v2`; this permits `CodeGen methods v2` to add to and not replace
+`v1`).
 
     # in tailbiter.py:
     import ast, collections, dis, types, sys
@@ -327,20 +326,30 @@ I've left out.)
         sys.argv.pop(0)
         run(sys.argv[0], '__main__')
 
-Here is the whole compiler as a 'literate program': a part in angle
-brackets stands for more code we'll see later. When we do, we'll show
-it starting with `# in the assembler:`. This chapter will get to two
-later, fancier versions of the same compiler, and they'll sometimes
-use chunks like `# in the assembler v1:` (replacing the earlier
-version, `v0`) and `# in CodeGen methods v1+:` (appearing in `v1` and
-also `v2`; this permits `CodeGen methods v2` to add to and not replace
-`v1`).
+Note that we've chosen to write a very small but working compiler as
+our first step -- we are running the assembler, generating the code,
+and then writing the generated code to a file that can be run by the
+Python interpreter. Alternatively, we could have restricted our
+exploration to just one of the layers (e.g. translating our assembly
+to bytecode and manually using `compile` in the interpreter to see
+what happens.) 
 
-In this code, `pop` removes the initial `argv[0]` to leave the command-line
-arguments the same as if we'd run Python on the source program
-directly: thus (with the compiler in `tailbiter.py`) you can run
-`python greet.py`, or `python tailbiter.py greet.py`, or (eventually)
-`python tailbiter.py tailbiter.py greet.py`...
+The technique of writing a minimalist but fully-functioning prototype
+that is often called a 'spike'. This is because we are writing a
+program that 'drives' through all the layers that we think we are
+going to exist in our finished product. The goal of a spike is to
+detect any obvious problems in our overall design as early as
+possible. It is thus important that we accept we may have to throw all
+of this code away -- in fact, there are many development methodologies
+that _require_ you to throw away the code and start again, no matter
+how successful the spike was in proving the design.
+
+Let's further explore our proposed spike. `pop` removes the
+initial `argv[0]` to leave the command-line arguments the same as if
+we'd run Python on the source program directly: thus (with the
+compiler in `tailbiter.py`) you can run `python greet.py`, or `python
+tailbiter.py greet.py`, or (eventually) `python tailbiter.py
+tailbiter.py greet.py`...
 
     # in compile and run a file:
     def run(filename, module_name):
@@ -361,43 +370,15 @@ directly: thus (with the compiler in `tailbiter.py`) you can run
 
     <<compile to code>>
 
+Throughout the compiler, `t` (for 'tree') names an AST object (also
+called a 'node'). 
+
 Compiling the module produces a function of no arguments; to run the
 module's code, we call that function (with `()`). The logic was split
 into two further functions as alternative entry points for
-testing. (We won't look into the tests.)
-
-Couldn't `compile_file` use a `with` statement? Actually, no,
-Tailbiter's code must keep to the constructs Tailbiter will implement.
-
-Throughout the compiler, `t` (for 'tree') names an AST object (also
-called a 'node'). These `t`'s appear everywhere.
-
-[XXX Perhaps I should find things to say about what makes a good
-spike/seed. A spike is "driven through the layers"; it works end to
-end, but doesn't actually do anything more than needed to establish a
-foothold (and no this nasty stew of metaphors should not go into the
-chapter as is). It's like K&R starting with hello-world: mastering the
-mechanics before mixing in the difficulties of a 'real' problem. My
-actual start was pretty close to what we're going to see below, but
-the above code about reading in a file and setting up the global
-environment, that was skipped: what I did instead was
-
-    ast5 = ast.parse("print(2+3)")
-    code5 = CodeGen().compile(ast5)
-    dis.dis(code5)
-
-    f = types.Function(code5, globals())
-    f()   # It's alive!
-
-i.e. wiring in the source code to compile, writing out a disassembly
-to look over, and sleazily reusing the tailbiter module's globals() in
-place of a fresh new one. (The latter eventually caused a bit of a
-headscratcher of a bug when I put off replacing that scaffolding for
-too long.) It'd be possible to make the presented seed more honest in
-this way, moving the above code to the middle-stage section, though
-it'd mean more total code in the chapter. It might make more sense to
-promote this note into the actual chapter (rewritten just a bit).
-XXX end of note]
+testing. (We have seen this pattern of compiling a program to a single
+function that can run the program's code elsewhere in this book; see
+the Templite chapter[XX] for another example of this.)
 
 
 ### A visitor walks over a tree
