@@ -1302,12 +1302,6 @@ now, and (b) why we need 'desugaring' and 'scope analysis'.]
 
 ### Sugar delenda est
 
-Before we start, we're going to need to build `ast.Call` nodes in
-several places. This will help:
-
-    def Call(fn, args):
-        return ast.Call(fn, args, [], None, None)
-
 Besides `NodeVisitor`, Python's `ast` module defines another visitor
 class, for *transforming* trees. It expects each visit method to
 return an AST node, which will be taken to replace the node that was
@@ -1383,33 +1377,36 @@ polluting the current scope as they did in Python 2.
 
         def visit_ListComp(self, t):
             t = self.generic_visit(t)
-            result_append = ast.Attribute(ast.Name('.result', load), 'append', load)
-            body = ast.Expr(Call(result_append, [t.elt]))
+            add_element = ast.Attribute(ast.Name('.elements', load), 'append', load)
+            body = ast.Expr(Call(add_element, [t.elt]))
             for loop in reversed(t.generators):
                 for test in reversed(loop.ifs):
                     body = ast.If(test, [body], [])
                 body = ast.For(loop.target, loop.iter, [body], [])
-            fn = [ast.Assign([ast.Name('.result', store)], ast.List([], load)),
-                  body,
-                  ast.Return(ast.Name('.result', load))]
-            no_args = ast.arguments([], None, [], None, [], [])
-            result = Call(Function('<listcomp>', no_args, fn), [])
+            fn = [body,
+                  ast.Return(ast.Name('.elements', load))]
+            args = ast.arguments([ast.arg('.elements', None)], None, [], None, [], [])
+            result = Call(Function('<listcomp>', args, fn),
+                          [ast.List([], load)])
             return ast.copy_location(result, t)
 
 For instance, `[n for n in numbers if n]` becomes a call to a
-locally-defined function having the following body, except that
-`result` actually gets the name `.result`, which can't occur in real Python
-source code and thus can't clash with variables from the source:
+locally-defined function almost like below:
 
     # in example.py:
-    result = []
-    for n in numbers:
-        if n:
-            result.append(n)
-    return result
+    def listcomp(elements)
+        for n in numbers:
+            if n:
+                elements.append(n)
+        return elements
 
-(We see also that `.result` won't clash with other instances of
-itself, because it's only used in the new function, locally.)
+`elements` gets its starting value, a new `[]`, from the call to the
+local function. The actual tree we generate can't quite be written as
+Python source: the function called 'listcomp' above is actually
+anonymous (the name `<listcomp>` will appear only as the name of the
+code object, not as a Python variable), and `elements` gets named
+`.elements`, a name which can't occur in real Python source code and
+thus can't clash with variables from the source.
 
 CPython generates more-efficient bytecode directly from the
 comprehension, in a hairier way. Generator comprehensions would add
@@ -1422,6 +1419,9 @@ hair too; we won't need them.
         _fields = ('name', 'args', 'body')
 
     load, store = ast.Load(), ast.Store()
+
+    def Call(fn, args):
+        return ast.Call(fn, args, [], None, None)
 
 (`Function` derives from `FunctionDef` for the sake of
 `ast.get_docstring` on it.)
