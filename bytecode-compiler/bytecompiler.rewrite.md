@@ -57,10 +57,10 @@ Say hello!
     name = 'Chrysophylax'
     print('Hi,', name)
 
-Another chapter [XXX the previous one?] explains how to dissect this
-text and expose its grammatical structure: that is, how to parse
-it. The parsed form is called an abstract syntax tree (AST); in this
-chapter we let Python's `ast.parse` produce it for us.
+The first step is to dissect this text and expose its grammatical
+structure: that is, to parse it. The parsed form is called an abstract
+syntax tree (AST); Python's `ast.parse` function can produce it for
+us. How `ast.parse` works would take a whole separate article.
 
     # in transcripts:
     >>> import ast, dis, astpp # (You can find astpp, by Alex Leone, on the web)
