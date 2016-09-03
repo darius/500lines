@@ -20,7 +20,7 @@ one?
 http://en.wikipedia.org/wiki/Principles_of_Compiler_Design#mediaviewer/File:Green_Dragon_Book_%28front%29.jpg
 Of course, there's copyright, besides it being kind of a distraction.]
 
-In this article, we will make a self-reliant genie---that is, a
+In this article, we'll make a self-reliant genie---that is, a
 small compiler able to compile itself. We'll write it in and for a
 subset of Python 3. The result---call it Tailbiter---will be a toy,
 but less of a toy than usual in an introduction: besides the
