@@ -322,15 +322,15 @@ also `v2`; this permits `CodeGen methods v2` to add to and not replace
         run(sys.argv[0], '__main__')
 
 Note that we've chosen to write a very small but working compiler as
-our first step -- we are running the assembler, generating the code,
-and then writing the generated code to a file that can be run by the
-Python interpreter. Alternatively, we could have restricted our
-exploration to just one of the layers (e.g. translating our assembly
-to bytecode and manually using `compile` in the interpreter to see
-what happens.) 
+our first step -- the code generator and the assembler will implement
+only fragments of the full job of a code generator or assembler, just
+the fragments needed by our first Python subset. Alternatively, we
+could have restricted our exploration to just one of the layers
+(e.g. translating our assembly to bytecode) and completed it before
+moving on.
 
 The technique of writing a minimalist but fully-functioning prototype
-that is often called a 'spike'. This is because we are writing a
+is often called a 'spike'. This is because we are writing a
 program that 'drives' through all the layers that we think we are
 going to exist in our finished product. 
 
@@ -491,7 +491,7 @@ assembly into a code object:
 Note that we begin the traversal process by calling
 `self(t.body)` -- this is because `CodeGen` is a _callable
 object_ [ref]. This means when you invoke an instance `c` of CodeGen as if
-it is a function, Python will translate that into `c.call(your args)`.
+it is a function, Python will translate that into `c.__call__(your args)`.
 So what does `__call__` do on `CodeGen`?
 
         def __call__(self, t):
