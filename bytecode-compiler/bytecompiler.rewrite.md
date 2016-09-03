@@ -1235,10 +1235,7 @@ We leave those as an exercise to the reader.
 ## A completed compiler: rendering functions and classes
 
 The next biggest gain of expressiveness will be in compiling functions
-and classes. [DEBO NOTE: We should also explicitly mention why we're
-adding listcomps and lambdas in this version. Are they related to
-function or classdefs in an interesting way? Will they be able to
-leverage the same infrastructure?] As we will see shortly, this requires even bigger changes
+and classes. As we will see shortly, this requires even bigger changes
 to our design.
 
     # in figure 2: ASTs added in Tailbiter version 2.
@@ -1256,18 +1253,17 @@ to our design.
 Once again, we ask ourselves if our current design can handle the
 complexity we've added in this version. 
 
-DEBO NOTE: [We need some kind of bridge here to demonstrate why (a) the answer is
-now, and (b) why we need 'desugaring' and 'scope analysis'.]
-
 * First we 'desugar' the AST, replacing some of the nodes
   with equivalent code that uses only simpler node types. (The language
   minus certain features is less sweet but equally nutritious.)
   CPython doesn't have this pass, though some have suggested it
   should: optimizations would be easier to express as AST rewrites
   than bytecode rewrites. (A trivial example: change `2+3` to `5`.)
-  Taibiter doesn't optimize, but it works this way because some node
+  Tailbiter doesn't optimize, but it works this way because some node
   types are a little simpler and substantially more readable to
-  compile to other node types than to bytecode.
+  compile to other node types than to bytecode: we'll transform
+  lambda expressions, function definitions, and list comprehensions
+  into into common node types.
 
 * We complain if the desugared AST departs from our subset of
   Python. CPython lacks this pass, of course, and we won't examine
@@ -1277,17 +1273,33 @@ now, and (b) why we need 'desugaring' and 'scope analysis'.]
 
 * Then we analyze the scope of variables: their definitions and uses
   in classes, functions, and function-like scopes such as lambda
-  expressions. Python's built-in `symtable` module can do this, but we
-  can't use it! It requires a source-code string, not an AST,
-  and ASTs lack a method to give us back source code. In
-  Tailbiter's early development I used `symtable` anyway, as
-  scaffolding; this forced it to take textual source code instead of
-  an AST for its input. (I would've wanted to write a new scope
-  analyzer regardless, to make the compiler self-contained.)
+  expressions. This scope information is needed to decide where each
+  variable should live at runtime: a global variable will appear in
+  the module's dictionary, looked up by name, while a local variable
+  appears in a local environment to be accessed at a known integer
+  index---this is why local variable access is fast. Variables may
+  also be defined in the body of a class---these are similar to global
+  variables---or in an outer scope and then accessed by a lambda
+  expression or nested function definition. These 'nonlocal' variables 
+  get accessed by bytecode in a couple of different ways, we'll see.
 
-* With the scope info in hand we generate bytecode as before.
+* With the scope info in hand we generate bytecode by walking the AST,
+  as before.
 
-<!-- XXX this line is for markdown formatting only XXX -->
+Do we need the complication of nonlocal variables? Maybe not: in the
+final compiler there are two lambda expressions. However, there are
+nine list comprehensions, which implicitly nest the scope, so that the
+loop variables they introduce don't leak out of the list comprehension
+and into the surrounding code. Python's no fun without list
+comprehensions. (Generator comprehensions would be nice to have, too,
+but then we'd effectively have to implement `yield`.)
+
+So there's no avoiding scope analysis. Python's built-in `symtable`
+module can do it for us, but we can't use it! It requires a
+source-code string, not an AST, and ASTs lack a method to give us back
+source code. In Tailbiter's early development I used `symtable`
+anyway, as scaffolding; this forced it to take textual source code
+instead of an AST for its input.
 
     # in compile to code v2:
     def code_for_module(module_name, filename, t):
