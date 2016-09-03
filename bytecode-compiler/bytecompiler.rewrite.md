@@ -1716,9 +1716,8 @@ OK, so! Wind it all up and watch the tail-eating:
     $ python3 tailbiter2.py tailbiter2.py tailbiter2.py greet.py 
     Hi, Chrysophylax
 
-[DEBO NOTE: We should also show here how writing a program with a
-runtime error in it will generate a stacktrace with line number
-information, since that was a major theme..]
+Or try it on a buggy program---i.e., most programs most of the
+time---and get a proper traceback.
 
 
 ## But why compile?
