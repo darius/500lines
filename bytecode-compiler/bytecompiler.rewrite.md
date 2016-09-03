@@ -1507,7 +1507,7 @@ protocol for a `NodeVisitor`:
     class Scope(ast.NodeVisitor):
         def __init__(self, t, defs):
             self.t = t
-            self.children = []       # Enclosed sub-scopes
+            self.children = {}       # Enclosed sub-scopes
             self.defs = set(defs)    # Variables defined
             self.uses = set()        # Variables referenced
 
@@ -1515,12 +1515,12 @@ protocol for a `NodeVisitor`:
             self.defs.add(t.name)
             for expr in t.bases: self.visit(expr)
             subscope = Scope(t, ())
-            self.children.append(subscope)
+            self.children[t] = subscope
             for stmt in t.body: subscope.visit(stmt)
 
         def visit_Function(self, t):
             subscope = Scope(t, [arg.arg for arg in t.args.args])
-            self.children.append(subscope)
+            self.children[t] = subscope
             for stmt in t.body: subscope.visit(stmt)
 
         def visit_Import(self, t):
@@ -1542,9 +1542,9 @@ scopes, then back up accumulating the references from enclosed ones:
 
         def analyze(self, parent_defs):
             self.local_defs = self.defs if isinstance(self.t, Function) else set()
-            for child in self.children:
+            for child in self.children.values():
                 child.analyze(parent_defs | self.local_defs)
-            child_uses = set([var for child in self.children
+            child_uses = set([var for child in self.children.values()
                                   for var in child.freevars])
             uses = self.uses | child_uses
             self.cellvars = tuple(child_uses & self.local_defs)
@@ -1556,18 +1556,12 @@ variable' must be taken from the enclosing scope instead. (In our
 example, `d` is a free variable in the lambda expression but a cell
 variable in the rest of `fn`.)
 
-The code generator uses `cellvars` and `freevars`, plus these methods:
+The code generator uses `cellvars` and `freevars`, plus this method:
 
         def access(self, name):
             return ('deref' if name in self.derefvars else
                     'fast'  if name in self.local_defs else
                     'name')
-
-        def get_child(self, t):
-            for child in self.children:
-                if child.t is t:
-                    return child
-            assert False
 
 Does scope analysis need to precede code generation? If we turned it
 around, first the code generator would generate symbolic assembly with
@@ -1602,10 +1596,10 @@ object out of this code object.
 
 The new `CodeGen` for this new code object requires a subscope of the
 current scope---previously computed by the scope analyzer, recovered
-by `self.scope.get_child(t)`.
+by `self.scope.children[t]`.
 
         def sprout(self, t):
-            return CodeGen(self.filename, self.scope.get_child(t))
+            return CodeGen(self.filename, self.scope.children[t])
 
 Building a function out of a code object depends on whether it has
 free variables. `lambda x: lambda y: x + y` compiles to
