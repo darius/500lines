@@ -20,56 +20,33 @@ one?
 http://en.wikipedia.org/wiki/Principles_of_Compiler_Design#mediaviewer/File:Green_Dragon_Book_%28front%29.jpg
 Of course, there's copyright, besides it being kind of a distraction.]
 
-To resolve the riddle, let's make a self-reliant genie---I mean, a
+In this chapter, we will make a self-reliant genie---that is, a
 small compiler able to compile itself. We'll write it in and for a
-subset of Python 3, adequate to clear, direct coding without demanding
-too much to implement. The result---call it Tailbiter---will be a toy,
+subset of Python 3. The result---call it Tailbiter---will be a toy,
 but less of a toy than usual in an introduction: besides the
 self-compiling, it'll include some details of debugging support. To
-make room for these emphases, let's drop the whole topic of
-optimization---in plainer terms, of making the output code less
+make room for these emphases, we will ignore the topic of
+optimization---or, in plainer terms, of making the output code less
 stupid.
 
-When we're done we'll find it all to be done with no trick, no
-powerful new principle: you'll need to be comfortable with recursion
-over a tree, with nested functions, and with reading a program
+All you'll need to follow along is comfort with recursion
+over a tree, nested functions, and reading a program
 dependent on some built-in Python libraries and types that I'll survey
 but not delve into.
 
-[XXX Just drop the above paragraph, I think. Older thoughts: Drop the
-mention of nested functions? I'm afraid it might scare people away who
-could get something out of this. But I don't want to overpromise
-accessibility either, not after the cries of despair over Udacity
-CS212. A similar potential hurdle is this being just generally more
-tightly coded than some are used to, like CS212 again. I'd like to
-acknowledge that reading code isn't easy---note how I already implied
-thinking my code is "clear and direct", how conceited---and encourage
-readers anyway. Implying it's clear and simple, when it's at least
-intricate and likely difficult, gets offputting. Warning that it's all
-elite and stuff is also offputting. Help? I guess the smallest change
-is from "adequate to clear, direct coding" to "adequate to code in". A
-pity to make it blander that way. Blah, overthinking!]
+So, where do we start? 
 
-This chapter's goal of self-hosting escapes a textbook's core concerns
-of generating smarter code, for more language features, with more
-useful errors. Thus it's understandable when most textbooks don't
-spell out a self-hosting compiler: instead you may get a smaller toy
-in the first chapter, then many intricate chapters on each piece of
-the full-scale ones used by hundreds of thousands of programmers. You
-might well start with the smaller toy; but in between such and the
-likes of Clang and GCC, a simple real compiler like Python's can offer
-engineering lessons too---and I'll try to model some of them in
-miniature. Most of all, I want to show a real(ish) compiler as just
-another program you can read and mess with.
+When I began this project, I knew quite a bit about how to write a compiler,
+but not very much about the Python virtual machine which we're targeting. Right
+away I hit the first snag the textbooks don't talk about: inadequate
+documentation. 
 
-When I began, I knew about compilers but not the Python virtual
-machine which we're targeting. Right away I hit the first snag the
-textbooks don't show you: inadequate documentation. We'll respond by
-building in stages, from a seed just capable of turning the simplest
-source code into working bytecode, learning from each stage how to
-grow into the next. Start with an example of our input and our output:
-a trivial program, from its source text to parsed syntax and then to
-runnable bytecode.
+We'll respond to this challenge by building in stages, from a seed just capable of
+turning the simplest source code into working bytecode, learning from each
+stage how to grow into the next. Start with an example of our input and our
+output: a trivial program, from its source text to parsed syntax and then to
+runnable bytecode. This technique of 'growing' your program in small stages is
+useful when working in an uncertain domain. 
 
 
 ## The input: an abstract syntax tree
@@ -101,7 +78,7 @@ chapter we let Python's `ast.parse` produce it for us.
           ], keywords=[], starargs=None, kwargs=None, lineno=2, col_offset=0), lineno=2, col_offset=0),
       ])
 
-So the module becomes an `ast.Module` whose `body` is a list of more
+We get an `ast.Module` whose `body` is a list of more
 of these `ast` objects---in this case two, an `ast.Assign`
 representing `name = 'Chrysophylax'` and an `ast.Expr` representing the call
 to `print`---each of these being built out of further `ast` objects: a
@@ -110,24 +87,23 @@ tree of them. Each object has fields proper to its type, plus a
 text it was parsed from. We'll sweat these details more when we get to
 them.
 
-You can find all the AST classes and their fields in
-`Parser/Python.asdl` in the Python 3 source distribution. As it's 100+
-lines long, with roughly one line per class, if we'll need to handle a
-fair fraction of the types then we can forecast a budget of only a few
-lines of code per type.
+You can find all the AST classes and their fields in `Parser/Python.asdl` in
+the Python 3 source distribution. It's 100+ lines long, with roughly one line
+per class; we'll need to handle a fair fraction of them to achieve our goal of
+a self-hosting compiler.
 
 
 ## The output: bytecode
 
 Compiling the module (with Python's built-in compiler, for now)
-gets us a code object, an internal Python type:
+yields a code object, which is an internal Python type:
 
     # in transcripts:
     >>> module_code = compile(module_ast, 'greet.py', 'exec')
     >>> module_code
     <code object <module> at 0xffdd76b0, file "greet.py", line 1>
 
-It has a bunch of attributes named starting with `co_`:
+It has a bunch of attributes prefixed with `co_`:
 
     # in examples:
     co_argcount       0
@@ -147,8 +123,7 @@ It has a bunch of attributes named starting with `co_`:
     co_varnames       ()
 
 What happened to our program? Mostly it's encoded into `co_code`: a
-sequence of bytecodes in a bytestring[^1]. Disassembly renders the
-meaning, using `dis.dis`:
+sequence of bytecodes in a bytestring[^1]. We can reveal the meaning of these bytecodes through disassembly, using `dis.dis`:
 
     # in transcripts:
     >>> dis.dis(module_code)
@@ -228,14 +203,17 @@ structure into a sequence of instructions to perform the operations in
 the right order. Each subtree of the parse tree turned into a
 subsequence of the instructions.
 
-The bytecode we just saw was specific to CPython 3.4; in other
-versions of Python the bytecode varies, maybe even for this tiny
-example. The code produced by Tailbiter is meant for CPython 3.4 only,
-and might crash other interpreters. (ASTs on the other hand are mostly
-compatible within a major version, like Python 3.*x*.)
+The bytecode we just saw was specific to CPython 3.4; in other versions of
+Python the bytecode varies, maybe even for this tiny example. The code produced
+by Tailbiter is meant for CPython 3.4 only, and might crash other interpreters.
+ASTs are mostly compatible within a major version, like Python 3.*x*.
 
 
 ### A symbolic assembly form
+
+Now that we've defined our problem a bit better, we can take our first step:
+building a compiler that can compile `greet.py`. We will do this by somehow
+translating the ast produced by `greet.py` into bytecode.
 
 To create the code object we saw above, it'd help to be able to write
 Python code that resembles the disassembly. Like this:
@@ -276,6 +254,14 @@ we can build our code in pieces to be strung together, like
 which produces the same bytecode: it doesn't matter how we chunk the
 assembly.
 
+There are a couple of reasons why this intermediate _assembly
+language_ is a useful place to start building our program. Since the
+bytecode specification is a source of major uncertainty for us, this
+layer isolates our tinkering with the bytecode to a very specific
+place in our program. Since the bytecode specification also changes
+more often than the ast spec does, this also provides us with an
+'insulating layer' between these two problem domains.
+
 A higher-level assembly language could've been made where instead of
 `op.LOAD_CONST(0)` this example would say `op.LOAD_CONST('Chrysophylax')`,
 leaving it to the assembler to turn `'Chrysophylax'` into an index into
@@ -289,14 +275,10 @@ integers, more so than for the assembler.
 
 ## The seed: a 'hello world' compiler
 
-We want to build a code object, but I haven't documented all the
-details that go into one. Neither did Python! We get to learn them by
-studying the system source code and trying things out. I would rather
-have read the source *after* writing my own, for the sake of fuller
-learning: it's curious how much smarter systems turn out when studied
-in that order. But I'd get stumped by the occasionally-outdated and
-more-often sketchy docs on the virtual machine and the code object, or
-by the code in `ceval.c`.
+We want to build a code object, but we don't know all the details that
+go into one. To face these uncertainties and start learning, let's
+make a complete working system for a tiny core subset of the problem:
+just enough to run our `greet.py`.
 
     # in figure 0: AST types understood by Tailbiter version 0.
     mod = Module(stmt* body)
@@ -311,34 +293,15 @@ by the code in `ceval.c`.
     expr_context = Load | Store
     keyword = (identifier arg, expr value)
 
-To face these uncertainties and start learning, let's make a complete
-working system for a tiny core subset of the problem: just enough to
-run our `greet.py`. (This staging may shore up my explanations the
-same way it helped me learn: if it comes to clearing up doubtful
-points by poking at the actual running code, it's easiest when it's
-smallest.) Figure 0 lists the AST classes we'll need to handle, and
+Figure 0 lists the AST classes we'll need to handle, and
 their fields. The second line, for instance, means that one type of
 statement is `ast.Assign`, which has a list of target expressions (the
 `*` means a list) and a value expression. This represents statements
-like `x = y = 2+3`, with `x` and `y` as targets. Python uses a tool to
-generate all of the AST classes from these declarations---it's another
-tiny compiler of a sort---though to us they're just documentation. (In
-some of the cases, like `Call`, full Python includes more fields which
-I've left out.)
+like `x = y = 2+3`, with `x` and `y` as targets. 
 
-    # in tailbiter.py:
-    import ast, collections, dis, types, sys
-    from functools import reduce
-    from itertools import chain
-    from check_subset import check_conformity
-
-    <<the assembler>>
-    <<the code generator>>
-    <<compile and run a file>>
-
-    if __name__ == '__main__':
-        sys.argv.pop(0)
-        run(sys.argv[0], '__main__')
+Python uses a tool to generate all of the AST classes from these
+declarations---it's another tiny compiler of a sort---though to us
+they're just documentation. 
 
 Here is the whole compiler as a 'literate program': a part in angle
 brackets stands for more code we'll see later. When we do, we'll show
@@ -349,11 +312,40 @@ version, `v0`) and `# in CodeGen methods v1+:` (appearing in `v1` and
 also `v2`; this permits `CodeGen methods v2` to add to and not replace
 `v1`).
 
-In this code, `pop` removes the initial `argv[0]` to leave the command-line
-arguments the same as if we'd run Python on the source program
-directly: thus (with the compiler in `tailbiter.py`) you can run
-`python greet.py`, or `python tailbiter.py greet.py`, or (eventually)
-`python tailbiter.py tailbiter.py greet.py`...
+    # in tailbiter.py:
+    <<the assembler>>
+    <<the code generator>>
+    <<compile and run a file>>
+
+    if __name__ == '__main__':
+        sys.argv.pop(0)
+        run(sys.argv[0], '__main__')
+
+Note that we've chosen to write a very small but working compiler as
+our first step -- the code generator and the assembler will implement
+only fragments of the full job of a code generator or assembler, just
+the fragments needed by our first Python subset. Alternatively, we
+could have restricted our exploration to just one of the layers
+(e.g. translating our assembly to bytecode) and completed it before
+moving on.
+
+The technique of writing a minimalist but fully-functioning prototype
+is often called a 'spike'. This is because we are writing a
+program that 'drives' through all the layers that we think we are
+going to exist in our finished product. 
+
+The goal of a spike is to detect any obvious problems in our overall design as
+early as possible. It is thus important that we accept we may have to throw all
+of this code away -- in fact, there are many development methodologies that
+_require_ you to throw away the code and start again, no matter how successful
+the spike was in proving the design.
+
+Let's further explore our proposed spike. `pop` removes the
+initial `argv[0]` to leave the command-line arguments the same as if
+we'd run Python on the source program directly: thus (with the
+compiler in `tailbiter.py`) you can run `python greet.py`, or `python
+tailbiter.py greet.py`, or (eventually) `python tailbiter.py
+tailbiter.py greet.py`...
 
     # in compile and run a file:
     def run(filename, module_name):
@@ -374,50 +366,25 @@ directly: thus (with the compiler in `tailbiter.py`) you can run
 
     <<compile to code>>
 
+Throughout the compiler, `t` (for 'tree') names an AST object (also
+called a 'node'). 
+
 Compiling the module produces a function of no arguments; to run the
 module's code, we call that function (with `()`). The logic was split
 into two further functions as alternative entry points for
-testing. (We won't look into the tests.)
+testing. (We have seen this pattern of compiling a program to a single
+function that can run the program's code elsewhere in this book; see
+the Templite chapter[XX] for another example of this.)
 
-Couldn't `compile_file` use a `with` statement? Actually, no,
-Tailbiter's code must keep to the constructs Tailbiter will implement.
+### From AST to code
 
-Throughout the compiler, `t` (for 'tree') names an AST object (also
-called a 'node'). These `t`'s appear everywhere.
+The last underspecified step in our spike is `<< compile to code >>`,
+which we will implement in `code_for_module`. The primary input to
+this function is the root (module) node of the AST, which it converts
+into bytecode. This means that we're going to need some tools to help
+us traverse the AST.
 
-[XXX Perhaps I should find things to say about what makes a good
-spike/seed. A spike is "driven through the layers"; it works end to
-end, but doesn't actually do anything more than needed to establish a
-foothold (and no this nasty stew of metaphors should not go into the
-chapter as is). It's like K&R starting with hello-world: mastering the
-mechanics before mixing in the difficulties of a 'real' problem. My
-actual start was pretty close to what we're going to see below, but
-the above code about reading in a file and setting up the global
-environment, that was skipped: what I did instead was
-
-    # in other.py:
-    ast5 = ast.parse("print(2+3)")
-    code5 = CodeGen().compile(ast5)
-    dis.dis(code5)
-
-    f = types.Function(code5, globals())
-    f()   # It's alive!
-
-i.e. wiring in the source code to compile, writing out a disassembly
-to look over, and sleazily reusing the tailbiter module's globals() in
-place of a fresh new one. (The latter eventually caused a bit of a
-headscratcher of a bug when I put off replacing that scaffolding for
-too long.) It'd be possible to make the presented seed more honest in
-this way, moving the above code to the middle-stage section, though
-it'd mean more total code in the chapter. It might make more sense to
-promote this note into the actual chapter (rewritten just a bit).
-XXX end of note]
-
-
-### A visitor walks over a tree
-
-An AST is a recursive data structure, for which we're going to write a
-few recursive functions. We might code one like
+We could try doing this from scratch:
 
     # in examples.py:
     def example(t):
@@ -430,7 +397,7 @@ few recursive functions. We might code one like
         else:
             raise Error("I don't know how to handle this kind of node", t)
 
-but the visitor classes in Python's `ast` module make our task a
+However, the visitor classes in Python's `ast` module make our task a
 little more convenient:
 
     class ExampleVisitor(ast.NodeVisitor):
@@ -452,26 +419,24 @@ This is called like so:
         Expr(value=Num(n=5)),
       ])
 
-The visitor pattern helps in two ways: it lets us define
+The visitor pattern separates the concern of traversing the tree
+(which is the same every time) from what we actually want to do in
+each traversal (which is situational). This lets us define
 separately-callable methods one a time rather than inserting `elif`s
-into a master function, and the `ast` module defines a convenient
-generic traversal which we'll see later.
-
-Instead of as functions or visitors, we might reasonably organize our
-logic as methods right in the AST classes, except we're given those
-classes as written already, and we'd have to code the generic
-traversal ourselves. [XXX delete this paragraph? Probably doesn't add
-enough]
+into a master function. These single-purpose methods are easy to 
+understand, test, and reuse later if the need arises. 
 
 
 ### A module becomes a code object
 
-The compiler at its core is a visitor that returns assembly code. As
-it walks through the tree, it remembers the names and constants it's
-seen, so that the emitted instructions can refer to names and
+We've designed our compiler as a visitor that returns assembly code.
+As it walks through the tree, it remembers the names and constants
+it's seen, so that the emitted instructions can refer to names and
 constants by index. After the walk it assembles the assembly code into
-a code object. Let's create this code-generation visitor and set it to
-work:
+a code object. 
+
+Let's instantiate this code-generation visitor and set it to work in
+our main compiler flow:
 
     # in compile to code v0:
     def code_for_module(module_name, filename, t):
@@ -480,12 +445,14 @@ work:
     class StubScope: freevars, cellvars, derefvars = (), (), ()
 
 (For the first time, we're seeing stub code that will be superseded
-later in this chapter in a fancier version of the compiler. All along,
-this code has been within waving distance of my actual first seed,
-but more polished, but also distorted some by foreknowledge: keeping
-the parts to be rewritten grouped in just a few definitions.)
+in a fancier version of the compiler. We'll return here later!)
 
-    # in the code generator:
+Our `CodeGen` visitor will have:
+
+- `visit_X` methods that are used to handle each type of AST node.
+- Tables to maintain the traversal state and helper methods to
+  manipulate them
+
     class CodeGen(ast.NodeVisitor):
 
         def __init__(self, filename, scope):
@@ -521,7 +488,46 @@ assembly into a code object:
                                   self.filename, name, firstlineno, lnotab,
                                   self.scope.freevars, self.scope.cellvars)
 
-This code object is littered with fields:
+Note that we begin the traversal process by calling
+`self(t.body)` -- this is because `CodeGen` is a _callable
+object_ [ref]. This means when you invoke an instance `c` of CodeGen as if
+it is a function, Python will translate that into `c.__call__(your args)`.
+So what does `__call__` do on `CodeGen`?
+
+        def __call__(self, t):
+            if isinstance(t, list): return concat(map(self, t)) 
+            assembly = self.visit(t)
+            return SetLineNo(t.lineno) + assembly if hasattr(t, 'lineno') else assembly
+
+It takes an AST node or a list of such nodes; when it's a list we get
+back all the results concatenated. We could define separate methods
+for visiting a list vs. a node, but conflating them turns out to unify
+some code to come.
+
+Once we visit a node, producing its assembly code, we can annotate the
+assembly with the node's source-line number. This spares us from
+writing the same in every `visit_Whatever` method.
+
+We haven't implemented `visit` yet, but we're calling it here. This is
+the default, `NodeVisitor` superclass implementation of the
+`visit` method: it calls the right `visit_Whatever` method for the
+type of the node visited. 
+
+f `visit_Whatever` is missing, `NodeVisitor.visit` will then call the
+template method `generic_visit`.  This should never happen; however,
+we're certainly going to make some mistakes during development. The
+default implementation of `generic_visit` does nothing, which makes it
+hard for us to notice when we've tried to handle a node type we're not
+ready for yet. So, let's make some noise if this ever happens:
+
+        def generic_visit(self, t):
+            assert False, t 
+
+# Debo NOTE: why not raise `NotImplementedError` here?
+
+### The state of a traversal
+
+Our code object is littered with fields:
 
   * The bytecode bytes themselves, from `assemble(assembly)`.
 
@@ -542,7 +548,7 @@ that grow as we walk the tree:
     def collect(table):
         return tuple(sorted(table, key=table.get))
 
-For `names` and `varnames` the keys are the name strings; but it gets
+For `names` and `varnames`, the keys are the name strings; but it gets
 trickier for `constants`. Equal names get the same slot in a names
 table, but 'equal' constants might not: for example, `5 == 5.0` is
 true, but `5` and `5.0` are nonetheless distinct. Therefore we key on
@@ -555,11 +561,11 @@ the type as well as the value of the constant:
         def collect_constants(self):
             return tuple([constant for constant,_ in collect(self.constants)])
 
-(There's a further subtlety in comparing with signed floating-point
+There's a further subtlety in comparing with signed floating-point
 zeroes, which we'll punt on by expelling negative zeroes in constants
 from the subset of the language we're going to handle. A
 `check_conformity` module, not presented in this chapter, can be
-called to make sure the input program is in our subset.)
+called to make sure the input program is in our subset.
 
 
 ### Expressions employ the stack
@@ -627,11 +633,6 @@ the assembly for its parts: if you compiled just `g(1)` or `h()`,
 you'd get some of the same code above (except perhaps for the indices
 assigned to the names `g` and `h`).
 
-(The virtual machine makes the stack not an actual Python list object,
-but a low-level array of words in memory. It's conventionally vertical
-instead of horizontal: a stack with a top we 'push' onto and 'pop'
-from, changing its 'depth'.)
-
     # in CodeGen methods v0+:
         def visit_Call(self, t):
             assert len(t.args) < 256 and len(t.keywords) < 256
@@ -650,54 +651,6 @@ XXX wasn't I going to say a bit more about how the stack makes code
 generation easy? Also, compact code. This is the kind of basic
 architectural choice this book probably wants analysis of, even though
 it's a human-lifetime-old design and forced on me by the CPython VM.
-
-As a technicality, the `CALL_FUNCTION` instruction's argument is a
-two-byte integer (like all instruction arguments, when present)
-encoding two individual bytes: the counts of keyword and positional
-arguments. Python's bytecode format does give a way to encode bigger
-numbers, but we punt on them. (Why not put the assertion in
-`check_conformity`? That wouldn't be terrible, but it'd be checking
-against seemingly arbitrary numbers in the midst of other code that
-only checks against a tree grammar. `check_conformity` enforces the
-*language subset* we claim to implement; here we enforce an
-implementation limit, at the point where the reason is
-clear. `check_conformity` does screen out fancier forms of calls like
-`f(*args, **kwargs)`. From here on I'll pass over such subsetting
-without comment. [XXX I rather want to drop this whole parenthetical.])
-
-The recursive visits like `self(t.func)` and `self(t.args)` (and
-`self(t.body)` back in `compile_module`) invoke `__call__`:
-
-        def __call__(self, t):
-            if isinstance(t, list): return concat(map(self, t)) 
-            assembly = self.visit(t)
-            return SetLineNo(t.lineno) + assembly if hasattr(t, 'lineno') else assembly
-
-It takes an AST node or a list of such nodes; when it's a list we get
-back all the results concatenated. (Python's AST and bytecodes were
-designed to make that simple chaining the right thing to do in most
-cases, as we just saw for compiling the arguments of a call.) We
-could define separate methods for visiting a list vs. a node, but
-conflating them turns out to unify some code to come.
-
-Once we visit a node, producing its assembly code, we can annotate the
-assembly with the node's source-line number. This spares us from
-writing the same in every `visit_Whatever` method.
-
-It's for brevity that the method gets the magical name `__call__`:
-we're going to use it all over.
-
-        def generic_visit(self, t):
-            assert False, t
-
-We've been depending on the default, superclass implementation of the
-`visit` method: it calls the right `visit_Whatever` method for the
-type of the node visited. But if that method is missing,
-`generic_visit` gets called. Since `check_conformity` will make sure
-we never see an unexpected node type, this "can't happen"---but during
-development, of course, it would. Before I overrode `generic_visit`,
-the default implementation would succeed silently, making my mistakes
-harder to see.
 
 
 ### Statements evaluate expressions
@@ -771,25 +724,13 @@ And at last `greet.py` works. Hurrah!
 
 ## A compiler half-grown: assembling control flow
 
-We're in business, ready to fill out the code generator with more visit
-methods for more AST node types. (See figure 1.) When we get to
-control-flow constructs like `if`-`else` we'll hit a new problem: they
-reduce to jumping around in the bytecode. The expression statement
-`yes if ok else no` becomes
-
-    # in examples:
-           0 LOAD_NAME                0 (ok)
-           3 POP_JUMP_IF_FALSE       12
-           6 LOAD_NAME                1 (yes)
-           9 JUMP_FORWARD             3 (to 15)
-     >>   12 LOAD_NAME                2 (no)
-     >>   15 POP_TOP
-
-where `POP_JUMP_IF_FALSE` does what it says: pops the value left by
-`ok`, tests it, and if it's false jumps to index 12---that is, makes
-that the next instruction to execute. Otherwise execution continues to
-the usual next instruction, at 6. `JUMP_FORWARD` likewise jumps to
-index 15[^2], to skip `no` if we chose `yes`.
+Now that we have driven our spike through all of the layers of our
+compiler architecture, we can think about how to build out more
+complicated use cases. We don't yet have any control flow in our
+Python subset, which is a pretty critical omission. We're also not
+able to import from other moduls, which makes it difficult to write
+programs of any reasonable size or complexity. Let's see what we can
+do to remedy this in Tailbiter version 1!
 
     # in figure 1: AST types added in Tailbiter version 1.
     stmt = For(expr target, expr iter, stmt* body)
@@ -818,16 +759,45 @@ index 15[^2], to skip `no` if we chose `yes`.
     unaryop = Invert | Not | UAdd | USub
     cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
 
+
+At this point, it's worth asking ourselves if we're going to face any
+problems in v1 that are materially different than what we faced in v0.
+What if we made a design decision in v0 that makes it impossible to
+proceed? 
+
+Indeed, control-flow constructs like `if`-`else` do present us with a
+challenge we haven't faced yet: they require us to 'jump around' in
+the bytecode. 
+
+For example, the expression statement `yes if ok else no` becomes
+
+    # in examples:
+           0 LOAD_NAME                0 (ok)
+           3 POP_JUMP_IF_FALSE       12
+           6 LOAD_NAME                1 (yes)
+           9 JUMP_FORWARD             3 (to 15)
+     >>   12 LOAD_NAME                2 (no)
+     >>   15 POP_TOP
+
+where `POP_JUMP_IF_FALSE` does what it says: pops the value left by
+`ok`, tests it, and if it's false jumps to index 12---that is, makes
+that the next instruction to execute. Otherwise execution continues to
+the usual next instruction, at 6. `JUMP_FORWARD` likewise jumps to
+index 15[^2], to skip `no` if we chose `yes`.
+
+
 [^2]: `POP_TOP` is not part of the code for the `if`
 expression itself, it's code for the expression statement containing
 the `if`. It's listed here because the `JUMP_FORWARD` jumps to
 it. Every `if` appears in a context where more bytecode will follow --
 a `RETURN_VALUE` instruction if nothing else.
 
-What makes this a problem? During code generation the compiler may not
-yet know the bytecode index where the jump target will be. Our answer:
-it invents a label for each target, emits that instead, and leaves it
-to `assemble` to resolve all the labels.
+What makes this a problem that our current design can't handle?
+During code generation the compiler may not yet know the bytecode
+index where the jump target will be. 
+
+Our answer: we invents a label for each target, emit that instead, and
+then use a separate `assemble` pass to resolve all the labels.
 
     # in CodeGen methods v1+:
         def visit_If(self, t):
@@ -839,27 +809,24 @@ to `assemble` to resolve all the labels.
 
         visit_IfExp = visit_If
 
-(This design is not inevitable. Notice that the example's
+This design is not inevitable. Notice that the example's
 `JUMP_FORWARD` argument is encoded as 3, when the target's at index
 15: 3 means the distance, taken from the instruction right after the
 jump (at index 12), to the target. Encoded this way, it's a 'relative'
-jump. Since for `if`-`else` the target always follows the jump, if we
+jump. 
+
+Since for `if`-`else` the target always follows the jump, if we
 emitted code in last-to-first order we'd know the target's distance at
 the time we emit the jump instruction. If all jump instructions were
 encoded this way, we could always encode the targets as we go along:
 just as the bytecode for a compound function call is the concatenation
 of the bytecode for its parts, so we'd make the bytecode for a
-compound statement by joining that of its parts. Sadly for this dream,
-`POP_JUMP_IF_FALSE` here encodes its target as the absolute address
-12. I don't know why the instructions take different encodings. I
-considered designing this more like a 'linker' than an assembler, but
-decided to stick near CPython's design: it makes surprises less
-likely.)
+compound statement by joining that of its parts. 
 
-(If-expressions and if-statements can share the same visit method 
-because `t.body` is an expression node when `t` is an if-expression,
-or a list of statement nodes when `t` is an if-statement, and `self()`
-can take either.)
+Sadly for this dream, `POP_JUMP_IF_FALSE` here encodes its target as
+the absolute address 12. (Why?) We could consider designing this more like
+a 'linker' than an assembler, but it is safer to stick near CPython's
+design: it makes surprises less likely.
 
 
 ### We analyze assembly code
@@ -1237,8 +1204,8 @@ We handle only the most common form of `raise`: `raise foo`.
 
 The `import` visitors are full of technical details I'll pass over. We
 could instead have turned `import` statements into `__import__()`
-calls and assignments, in the desugaring pass we'll see soon; but that
-would take about as much compiler code, to produce worse compiled
+calls and assignments; but that would take about as much compiler
+code, to produce worse compiled
 code.
 
         def visit_While(self, t):
@@ -1261,15 +1228,19 @@ Compiling `while` and `for`, for our subset, needs nothing new. (I
 won't explain what `SETUP_LOOP` and friends do at runtime.)
 
 Now we have a runnable program again, that can compile
-nontrivial computations. We could flesh it out further with more node
-types---`break` and `continue`, for example. But the biggest gain in
-usefulness---compiling functions and classes---requires bigger
-changes.
-
+nontrivial computations! We could flesh it out further with more node
+types---`break` and `continue`, for example; however, those don't add
+materially to the complexity of the kinds of programs we can compile.
+We leave those as an exercise to the reader.
 
 ## A completed compiler: rendering functions and classes
 
-For these (figure 2), we'll need more passes:
+The next biggest gain of expressiveness will be in compiling functions
+and classes. [DEBO NOTE: We should also explicitly mention why we're
+adding listcomps and lambdas in this version. Are they related to
+function or classdefs in an interesting way? Will they be able to
+leverage the same infrastructure?] As we will see shortly, this requires even bigger changes
+to our design.
 
     # In figure 2: ASTs added in Tailbiter version 2.
     stmt = FunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list)
@@ -1282,6 +1253,12 @@ For these (figure 2), we'll need more passes:
     expr = Lambda(arguments args, expr body)
          | ListComp(expr elt, comprehension* generators)
     comprehension = (expr target, expr iter, expr* ifs)
+
+Once again, we ask ourselves if our current design can handle the
+complexity we've added in this version. 
+
+DEBO NOTE: [We need some kind of bridge here to demonstrate why (a) the answer is
+now, and (b) why we need 'desugaring' and 'scope analysis'.]
 
 * First we 'desugar' the AST, replacing some of the nodes
   with equivalent code that uses only simpler node types. (The language
@@ -1721,17 +1698,15 @@ definition as 'fast'.
                         + self(t.body) + self.load_const(None) + op.RETURN_VALUE)
             return self.make_code(assembly, t.name, 0)
 
-I felt tempted a bit to leave classes unimplemented. Python stopped
-needing them once it gained proper nested functions---in terms of
-expressive power, if not familiarity and legacy. As it worked out,
-most of the simplicity from flushing `class` can be gotten by
-forbidding nested classes (that is, nested in a `class` or a `def`).
-
 OK, so! Wind it all up and watch the tail-eating:
 
     # in transcripts:
     $ python3 tailbiter2.py tailbiter2.py tailbiter2.py greet.py 
     Hi, Chrysophylax
+
+[DEBO NOTE: We should also show here how writing a program with a
+runtime error in it will generate a stacktrace with line number
+information, since that was a major theme..]
 
 
 ## But why compile?
