@@ -354,32 +354,27 @@ tailbiter.py greet.py`...
 
     # in compile and run a file:
     def run(filename, module_name):
-        compile_file(filename, module_name)()
-
-    def compile_file(filename, module_name):
         f = open(filename)
         source = f.read()
         f.close()
-        return function_for_module(module_name, filename, ast.parse(source))
+        return module_from_ast(module_name, filename, ast.parse(source))
 
-    def function_for_module(module_name, filename, t):
+    def module_from_ast(module_name, filename, t):
         code = code_for_module(module_name, filename, t)
-        f_globals = dict(__package__=None, __spec__=None, __name__=module_name,
-                         __loader__=__loader__, __builtins__=__builtins__,
-                         __doc__=ast.get_docstring(t))
-        return types.FunctionType(code, f_globals)
+        module = types.ModuleType(module_name, ast.get_docstring(t))
+        exec(code, module.__dict__)
+        return module
 
     <<compile to code>>
 
 Throughout the compiler, `t` (for 'tree') names an AST object (also
-called a 'node'). 
-
-Compiling the module produces a function of no arguments; to run the
-module's code, we call that function (with `()`). The logic was split
-into two further functions as alternative entry points for
-testing. (We have seen this pattern of compiling a program to a single
-function that can run the program's code elsewhere in this book; see
-the Templite chapter[XX] for another example of this.)
+called a 'node'). Here `ast.parse` gives us one, we make a code object
+from it with `code_for_module` (to be written), then we let CPython
+execute the code to populate a new module object. The same things
+happen when you `import` a module, but with Python's built-in
+`compile` function in place of `code_for_module`. (We won't look into
+how Python's import-hook machinery could let us make `import` call on
+our loader instead of the default one.)
 
 ### From AST to code
 
