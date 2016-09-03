@@ -522,9 +522,7 @@ hard for us to notice when we've tried to handle a node type we're not
 ready for yet. So, let's make some noise if this ever happens:
 
         def generic_visit(self, t):
-            assert False, t 
-
-# Debo NOTE: why not raise `NotImplementedError` here?
+            raise NotImplementedError()
 
 ### The state of a traversal
 
