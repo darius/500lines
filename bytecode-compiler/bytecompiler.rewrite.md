@@ -308,8 +308,8 @@ brackets stands for more code we'll see later. When we do, we'll show
 it starting with `# in the assembler:`. This chapter will get to two
 later, fancier versions of the same compiler, and they'll sometimes
 use chunks like `# in the assembler v1:` (replacing the earlier
-version, `v0`) and `# in CodeGen methods v1+:` (appearing in `v1` and
-also `v2`; this permits `CodeGen methods v2` to add to and not replace
+version, `v0`) and `# in CodeGen v1+:` (appearing in `v1` and
+also `v2`; this permits `CodeGen v2` to add to and not replace
 `v1`).
 
     # in tailbiter.py:
@@ -449,6 +449,8 @@ our main compiler flow:
 
     class StubScope: freevars, cellvars, derefvars = (), (), ()
 
+    <<CodeGen>>
+
 (For the first time, we're seeing stub code that will be superseded
 in a fancier version of the compiler. We'll return here later!)
 
@@ -458,6 +460,7 @@ Our `CodeGen` visitor will have:
 - Tables to maintain the traversal state and helper methods to
   manipulate them
 
+    # in CodeGen v0+:
     class CodeGen(ast.NodeVisitor):
 
         def __init__(self, filename, scope):
@@ -467,13 +470,11 @@ Our `CodeGen` visitor will have:
             self.names     = make_table()
             self.varnames  = make_table()
 
-    <<CodeGen methods>>
-
 Recall the disassembly of a module, above: there was the body code,
 then `LOAD_CONST` of `None`, then `RETURN_VALUE`. We turn that
 assembly into a code object:
 
-    # in CodeGen methods v0+:
+    # in CodeGen v0+:
         def compile_module(self, t, name):
             assembly = self(t.body) + self.load_const(None) + op.RETURN_VALUE
             return self.make_code(assembly, name, 0)
@@ -559,7 +560,7 @@ table, but 'equal' constants might not: for example, `5 == 5.0` is
 true, but `5` and `5.0` are nonetheless distinct. Therefore we key on
 the type as well as the value of the constant:
 
-    # in CodeGen methods v0+:
+    # in CodeGen v0+:
         def load_const(self, constant):
             return op.LOAD_CONST(self.constants[constant, type(constant)])
 
@@ -638,7 +639,7 @@ the assembly for its parts: if you compiled just `g(1)` or `h()`,
 you'd get some of the same code above (except perhaps for the indices
 assigned to the names `g` and `h`).
 
-    # in CodeGen methods v0+:
+    # in CodeGen v0+:
         def visit_Call(self, t):
             assert len(t.args) < 256 and len(t.keywords) < 256
             return (self(t.func) + self(t.args) + self(t.keywords)
@@ -804,7 +805,7 @@ index where the jump target will be.
 Our answer: we invents a label for each target, emit that instead, and
 then use a separate `assemble` pass to resolve all the labels.
 
-    # in CodeGen methods v1+:
+    # in CodeGen v1+:
         def visit_If(self, t):
             orelse, after = Label(), Label()
             return (           self(t.test) + op.POP_JUMP_IF_FALSE(orelse)
@@ -1040,7 +1041,7 @@ Dict literals like `{'a': 'x', 'b': 'y'}` turn into code like
 
 so:
 
-    # in CodeGen methods v1+:
+    # in CodeGen v1+:
         def visit_Dict(self, t):
             return (op.BUILD_MAP(min(0xFFFF, len(t.keys)))
                     + concat([self(v) + self(k) + op.STORE_MAP
@@ -1068,7 +1069,7 @@ Like name nodes, subscript nodes can appear on the left-hand side of
 an assignment statement, like `a.x = 42`. They carry a `t.ctx` field
 just like a name's.
 
-    # in CodeGen methods v1+:
+    # in CodeGen v1+:
         def visit_Subscript(self, t):
             return self(t.value) + self(t.slice.value) + self.subscr_ops[type(t.ctx)]
         subscr_ops = {ast.Load: op.BINARY_SUBSCR, ast.Store: op.STORE_SUBSCR}
@@ -1089,7 +1090,7 @@ load, `['a', 'b']` becomes
 where 2 is the length of the list. Unlike with `BUILD_MAP` the length
 must be exact.
 
-    # in CodeGen methods v1+:
+    # in CodeGen v1+:
         def visit_List(self, t):  return self.visit_sequence(t, op.BUILD_LIST)
         def visit_Tuple(self, t): return self.visit_sequence(t, op.BUILD_TUPLE)
 
@@ -1111,7 +1112,7 @@ own instruction, for efficiency. `not -x` gets compiled to
 
 so:
 
-    # in CodeGen methods v1+:
+    # in CodeGen v1+:
         def visit_UnaryOp(self, t):
             return self(t.operand) + self.ops1[type(t.op)]
         ops1 = {ast.UAdd: op.UNARY_POSITIVE,  ast.Invert: op.UNARY_INVERT,
@@ -1141,7 +1142,7 @@ single expression as a single AST node holding a list of operators and
 a list of their right operands. Our subset of Python doesn't cover
 this case, only binary comparisons like `x<2`.
 
-    # in CodeGen methods v1+:
+    # in CodeGen v1+:
         def visit_Compare(self, t):
             [operator], [right] = t.ops, t.comparators
             cmp_index = dis.cmp_op.index(self.ops_cmp[type(operator)])
@@ -1164,7 +1165,7 @@ consistent across different branches of control. `print(x or y)` compiles to
 false. At index 12, whichever way execution got there, the stack has
 the same height: two entries.
 
-    # in CodeGen methods v1+:
+    # in CodeGen v1+:
         def visit_BoolOp(self, t):
             op_jump = self.ops_bool[type(t.op)]
             def compose(left, right):
@@ -1300,6 +1301,8 @@ now, and (b) why we need 'desugaring' and 'scope analysis'.]
         t = desugar(t)
         check_conformity(t)
         return CodeGen(filename, top_scope(t)).compile_module(t, module_name)
+
+    <<CodeGen>>
 
 
 ### Sugar delenda est
@@ -1584,7 +1587,7 @@ code. In varying from CPython's approach, it's riskier.
 
 ### We generate code for functions
 
-    # in CodeGen methods v2:
+    # in CodeGen v2:
         def visit_Return(self, t):
             return ((self(t.value) if t.value else self.load_const(None))
                     + op.RETURN_VALUE)
@@ -1636,7 +1639,7 @@ already arranged for the needed cells to be among the current scope's
 the new function. (In 'real' Python the nested lambda's name would be
 `<lambda>.<locals>.<lambda>`, reflecting the nesting.)
 
-    # in CodeGen methods v2:
+    # in CodeGen v2:
         def make_closure(self, code, name):
             if code.co_freevars:
                 return (concat([op.LOAD_CLOSURE(self.cell_index(freevar))

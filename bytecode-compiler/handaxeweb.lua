@@ -200,7 +200,7 @@ function tangle(chunks, chunkname, version, indent)
         error(string.format("chunk `%s` does not exist", 
                             chunkname))
     end
-    
+
     local text = get_chunk_text(contents, version)
     if text == nil then 
         io.stderr:write(string.format("chunk `%s` has no version `%d`\n",
