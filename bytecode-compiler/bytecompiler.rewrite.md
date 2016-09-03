@@ -1302,14 +1302,20 @@ now, and (b) why we need 'desugaring' and 'scope analysis'.]
 
 ### Sugar delenda est
 
+Before we start, we're going to need to build `ast.Call` nodes in
+several places. This will help:
+
+    def Call(fn, args):
+        return ast.Call(fn, args, [], None, None)
+
+Besides `NodeVisitor`, Python's `ast` module defines another visitor
+class, for *transforming* trees. It expects each visit method to
+return an AST node, which will be taken to replace the node that was
+the argument. The default behavior recurses on child nodes, leaving
+the node otherwise unchanged. Desugaring uses such a transformer:
+
     def desugar(t):
         return ast.fix_missing_locations(Desugarer().visit(t))
-
-Python's `ast` module defines another visitor class, for *transforming*
-trees. It expects each visit method to return an AST node, which
-will be taken to replace the node that was the argument. The default
-behavior recurses on child nodes, leaving the node otherwise unchanged.
-Desugaring uses such a transformer:
 
     class Desugarer(ast.NodeTransformer):
 
@@ -1326,9 +1332,8 @@ runtime calls whatever `AssertionError` is bound to.
             t = self.generic_visit(t)
             result = ast.If(t.test,
                             [],
-                            [ast.Raise(ast.Call(ast.Name('AssertionError', load),
-                                                [] if t.msg is None else [t.msg],
-                                                [], None, None),
+                            [ast.Raise(Call(ast.Name('AssertionError', load),
+                                            [] if t.msg is None else [t.msg]),
                                        None)])
             return ast.copy_location(result, t)
 
@@ -1358,7 +1363,7 @@ a new AST node type we'll define, called `Function`:
             fn = Function(t.name, t.args, t.body)
             result = ast.Assign([ast.Name(t.name, store)], fn)
             for d in reversed(t.decorator_list):
-                result = ast.Call(d, [result], [], None, None)
+                result = Call(d, [result])
             return ast.copy_location(result, t)
 
 This is as if we turned `def answer(): return 42` into `answer =
@@ -1379,7 +1384,7 @@ polluting the current scope as they did in Python 2.
         def visit_ListComp(self, t):
             t = self.generic_visit(t)
             result_append = ast.Attribute(ast.Name('.result', load), 'append', load)
-            body = ast.Expr(ast.Call(result_append, [t.elt], [], None, None))
+            body = ast.Expr(Call(result_append, [t.elt]))
             for loop in reversed(t.generators):
                 for test in reversed(loop.ifs):
                     body = ast.If(test, [body], [])
@@ -1388,8 +1393,7 @@ polluting the current scope as they did in Python 2.
                   body,
                   ast.Return(ast.Name('.result', load))]
             no_args = ast.arguments([], None, [], None, [], [])
-            result = ast.Call(Function('<listcomp>', no_args, fn),
-                              [], [], None, None)
+            result = Call(Function('<listcomp>', no_args, fn), [])
             return ast.copy_location(result, t)
 
 For instance, `[n for n in numbers if n]` becomes a call to a
