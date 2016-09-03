@@ -313,6 +313,11 @@ also `v2`; this permits `CodeGen methods v2` to add to and not replace
 `v1`).
 
     # in tailbiter.py:
+    import ast, collections, dis, types, sys
+    from functools import reduce
+    from itertools import chain
+    from check_subset import check_conformity
+
     <<the assembler>>
     <<the code generator>>
     <<compile and run a file>>
