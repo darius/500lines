@@ -1785,11 +1785,15 @@ Exploring that question exceeds my scope here---but maybe not yours.
 
 ## Continuations
 
-Where next? It could be fun to grow this to take in the code for a
-bytecode interpreter, like the one in this book (and reciprocally, till
-they eat each other). I hope they needn't balloon too much. Add the
-parser, and a life like Robinson Crusoe's starts to look attainable,
-if still not quite to be envied.
+Where next? Since writing this, I've let it grow a little to be able
+to compile an interpreter in Python of the CPython bytecodes we emit;
+you can find both together in the [Tailbiter
+repo](https://github.com/darius/tailbiter). There's a start on a
+Python parser; finish that and add an implementation of the core
+Python runtime features like dictionaries and classes, and you'd be
+approaching a genuinely self-sustaining system like Smalltalk. (I
+think the biggest remaining lacuna by then would be exception
+handling.)
 
 An optimizer's yet unwritten. I can imagine one serving to prototype a
 successor for CPython's peephole optimizer, someday. And how fast can
