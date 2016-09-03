@@ -1548,7 +1548,7 @@ scopes, then back up accumulating the references from enclosed ones:
                                   for var in child.freevars])
             uses = self.uses | child_uses
             self.cellvars = tuple(child_uses & self.local_defs)
-            self.freevars = tuple(parent_defs & (uses - self.local_defs))
+            self.freevars = tuple(uses & (parent_defs - self.local_defs))
             self.derefvars = self.cellvars + self.freevars
 
 A 'cell variable' is a deref defined in the current scope; a 'free
