@@ -1247,7 +1247,7 @@ function or classdefs in an interesting way? Will they be able to
 leverage the same infrastructure?] As we will see shortly, this requires even bigger changes
 to our design.
 
-    # In figure 2: ASTs added in Tailbiter version 2.
+    # in figure 2: ASTs added in Tailbiter version 2.
     stmt = FunctionDef(identifier name, arguments args, stmt* body, expr* decorator_list)
          | ClassDef(identifier name, expr* bases, stmt* body)
          | Return(expr? value)

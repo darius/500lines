@@ -43,7 +43,7 @@ function unindented(line) return string.sub(line, 5) end
 assert(unindented("    hi\n") == "hi\n")
 
 function get_chunk_label(line)
-    return string.match(line, "^[^%w]*in (.*):[^%w]*$")
+    return string.match(line, "^[^%w]*in (.*):.*$")
 end
 
 assert(get_chunk_label("-- in handaxeweb.lua:") ==
