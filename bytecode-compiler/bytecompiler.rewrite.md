@@ -203,10 +203,10 @@ structure into a sequence of instructions to perform the operations in
 the right order. Each subtree of the parse tree turned into a
 subsequence of the instructions.
 
-The bytecode we just saw was specific to CPython 3.4; in other versions of
-Python the bytecode varies, maybe even for this tiny example. The code produced
-by Tailbiter is meant for CPython 3.4 only, and might crash other interpreters.
-ASTs are mostly compatible within a major version, like Python 3.*x*.
+The bytecode we just saw was meant for CPython 3.4, and known to work
+on 3.5; in other versions of Python the bytecode varies, maybe even
+for this tiny example. It might crash other interpreters. ASTs are
+mostly compatible within a major version, like Python 3.*x*.
 
 
 ### A symbolic assembly form
