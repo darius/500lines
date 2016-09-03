@@ -20,7 +20,7 @@ one?
 http://en.wikipedia.org/wiki/Principles_of_Compiler_Design#mediaviewer/File:Green_Dragon_Book_%28front%29.jpg
 Of course, there's copyright, besides it being kind of a distraction.]
 
-In this chapter, we will make a self-reliant genie---that is, a
+In this article, we will make a self-reliant genie---that is, a
 small compiler able to compile itself. We'll write it in and for a
 subset of Python 3. The result---call it Tailbiter---will be a toy,
 but less of a toy than usual in an introduction: besides the
@@ -305,8 +305,8 @@ they're just documentation.
 
 Here is the whole compiler as a 'literate program': a part in angle
 brackets stands for more code we'll see later. When we do, we'll show
-it starting with `# in the assembler:`. This chapter will get to two
-later, fancier versions of the same compiler, and they'll sometimes
+it starting with `# in the assembler:`. Later we'll get to two
+fancier versions of the same compiler, and they'll sometimes
 use chunks like `# in the assembler v1:` (replacing the earlier
 version, `v0`) and `# in CodeGen v1+:` (appearing in `v1` and
 also `v2`; this permits `CodeGen v2` to add to and not replace
@@ -563,7 +563,7 @@ the type as well as the value of the constant:
 There's a further subtlety in comparing with signed floating-point
 zeroes, which we'll punt on by expelling negative zeroes in constants
 from the subset of the language we're going to handle. A
-`check_conformity` module, not presented in this chapter, can be
+`check_conformity` module, not presented in this article, can be
 called to make sure the input program is in our subset.
 
 
