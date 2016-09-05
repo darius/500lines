@@ -1799,8 +1799,7 @@ we compile? Faster than I did, that can't be hard.
 Peter Norvig's _Paradigms of Artificial Intelligence Programming_,
 despite the title, presents short compilers for Scheme, Prolog, and a
 pattern-matching rewrite-rule language. They all go to some trouble to
-produce efficient output. The code is of the highest quality, and not
-much longer than this book's examples.
+produce efficient output. The code is of the highest quality.
 
 Niklaus Wirth's [_Compiler
 Construction_](http://www.ethoberon.ethz.ch/WirthPubl/CBEAll.pdf)
