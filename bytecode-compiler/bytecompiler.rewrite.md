@@ -610,22 +610,22 @@ Evidently the load instructions stash their values somewhere for
 `CALL_FUNCTION` to use. That somewhere is the stack: a growing and
 shrinking list of values. Each load appends to it, and each call
 removes a function and its arguments from the end and replaces them
-with one value, the result of the call. This scheme gives a
-more-complex expression like `f(g(1), h())` a place for the
+with one value: the result of the call. This scheme gives a
+more-complex expression like `f(g(7), h())` a place for the
 partial results to live:
 
     # in examples:
                                                    (the stack afterwards)
            0 LOAD_NAME                0 (f)        [f]
            3 LOAD_NAME                1 (g)        [f, g]
-           6 LOAD_CONST               0 (1)        [f, g, 1]
-           9 CALL_FUNCTION            1            [f, g(1)]
-          12 LOAD_NAME                2 (h)        [f, g(1), h]
-          15 CALL_FUNCTION            0            [f, g(1), h()]
-          18 CALL_FUNCTION            2            [f(g(1), h())]
+           6 LOAD_CONST               0 (7)        [f, g, 7]
+           9 CALL_FUNCTION            1            [f, g(7)]
+          12 LOAD_NAME                2 (h)        [f, g(7), h]
+          15 CALL_FUNCTION            0            [f, g(7), h()]
+          18 CALL_FUNCTION            2            [f(g(7), h())]
 
 The assembly code for the full, compound call is a concatenation of
-the assembly for its parts: if you compiled just `g(1)` or `h()`,
+the assembly for its parts: if you compiled just `g(7)` or `h()`,
 you'd get some of the same code above (except perhaps for the indices
 assigned to the names `g` and `h`).
 
