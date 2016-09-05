@@ -610,7 +610,7 @@ Evidently the load instructions stash their values somewhere for
 `CALL_FUNCTION` to use. That somewhere is the stack: a growing and
 shrinking list of values. Each load appends to it, and each call
 removes a function and its arguments from the end and replaces them
-with one value: the result of the call. This scheme gives a
+with one value: the result of the call.[^3] This scheme gives a
 more-complex expression like `f(g(7), h())` a place for the
 partial results to live:
 
@@ -623,6 +623,11 @@ partial results to live:
           12 LOAD_NAME                2 (h)        [f, g(7), h]
           15 CALL_FUNCTION            0            [f, g(7), h()]
           18 CALL_FUNCTION            2            [f(g(7), h())]
+
+[^3]: The virtual machine makes the stack not an actual Python list
+object, but a low-level array of words in memory. It's conventionally
+pictured as vertical instead of horizontal: a stack with a top we
+'push' onto and 'pop' from, changing its 'depth'.
 
 The assembly code for the full, compound call is a concatenation of
 the assembly for its parts: if you compiled just `g(7)` or `h()`,
@@ -779,10 +784,9 @@ where `POP_JUMP_IF_FALSE` does what it says: pops the value left by
 `ok`, tests it, and if it's false jumps to index 12---that is, makes
 that the next instruction to execute. Otherwise execution continues to
 the usual next instruction, at 6. `JUMP_FORWARD` likewise jumps to
-index 15[^3], to skip `no` if we chose `yes`.
+index 15[^4], to skip `no` if we chose `yes`.
 
-
-[^3]: `POP_TOP` is not part of the code for the `if`
+[^4]: `POP_TOP` is not part of the code for the `if`
 expression itself, it's code for the expression statement containing
 the `if`. It's listed here because the `JUMP_FORWARD` jumps to
 it. Every `if` appears in a context where more bytecode will follow --
@@ -1321,11 +1325,11 @@ the node otherwise unchanged. Desugaring uses such a transformer:
     class Desugarer(ast.NodeTransformer):
 
 For a start, we rewrite statements like `assert cookie, "Want
-cookie!"` into `if not cookie: raise AssertionError("Want cookie!")`[^4].
+cookie!"` into `if not cookie: raise AssertionError("Want cookie!")`[^5].
 (Rather, into an if-then-else with the `raise` in the `else`
 clause: this is slightly simpler.)
 
-[^4]: You might wonder if this is quite correct: what if the code
+[^5]: You might wonder if this is quite correct: what if the code
 being compiled redefines `AssertionError`? But `assert` itself at
 runtime calls whatever `AssertionError` is bound to.
 
