@@ -576,7 +576,7 @@ and function calls. A constant expression turns into a
         def visit_Str(self, t):          return self.load_const(t.s)
         visit_Bytes = visit_Str
 
-A name also becomes a single instruction, but which one depends on
+A name also becomes a single instruction, but the choice depends on
 context: a name can appear as the target of an assignment, not just in
 an expression. Python ASTs use the same node-type for both roles, with
 a `ctx` field to distinguish them:
@@ -588,9 +588,9 @@ a `ctx` field to distinguish them:
 
     <<generate variable accesses>>
 
-When we get to compiling functions and classes, the logic will get
-fancier because names will live in different scopes, but for now
-they're all global:
+When we get to compiling functions and classes, we'll need fancier
+logic because names will live in different scopes, but for now all
+names are global:
 
     # in generate variable accesses v0:
         def load(self, name):  return op.LOAD_NAME(self.names[name])
