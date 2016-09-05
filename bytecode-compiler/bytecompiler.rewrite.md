@@ -138,39 +138,8 @@ sequence of bytecodes in a bytestring[^1]. We can reveal the meaning of these by
                  19 LOAD_CONST               2 (None)
                  22 RETURN_VALUE
 
-[^1]: A Python bytestring, shown like `b'foo'`, is like a string, but
+[^1]: A Python bytestring, such as `b'foo'`, is like a string, but
 of 8-bit bytes instead of Unicode characters.
-
-[XXX I think we're still just a little too abrupt in digging into
-it... Maybe say something like "We're going to need these details, but
-don't worry about making them stick; maybe you'll want to review if
-you dig into the code"? Or how about a diagram of the AST together
-with the disassembly, with the correspondence marked out? Something like
-
-    Module(
-     body=[
-      Assign(
-       value=Str(s='Chrysophylax'),           0 LOAD_CONST      0 ('Chrysophylax')
-       targets=[Name(id='name',ctx=Store())]  3 STORE_NAME      0 (name)
-      ),
-      Expr(
-       value=Call(
-        func=Name(id='print', ctx=Load()),    6 LOAD_NAME       1 (print)
-        args=[
-         Str(s='Hi,'),                        9 LOAD_CONST      1 ('Hi,')
-         Name(id='name', ctx=Load()),        12 LOAD_NAME       0 (name)
-        ]
-       )                                     15 CALL_FUNCTION   2 (2 positional, 0 keyword pair)
-      )                                      18 POP_TOP
-     ]                                       19 LOAD_CONST      2 (None)
-                                             22 RETURN_VALUE
-    )
-
-and maybe both this subsection and the preceding one could share this
-one figure, positioned between the sections? The figure's layout would
-need to make it very clear that it's showing two things with a mapping
-between them, not one complicated thing. Also, one brief mention of
-the line-number info left out of the figure. XXX end of note]
 
 On the left are source-code line numbers (1 and 2); down the middle go
 bytecode instructions, each labeled with the address it's encoded at;
@@ -180,7 +149,8 @@ instruction, with 0 as an argument. (For a `LOAD_CONST` the argument
 means an index into the `co_consts` attribute, whose 0th entry, above,
 is indeed `'Chrysophylax'`.) This instruction appears in `co_code` as
 `d\x00\x00`: one byte `d` which happens to mean `LOAD_CONST`, followed
-by two bytes encoding the integer 0.
+by two bytes encoding the integer 0. (Don't worry yet about the exact
+details; we're looking for a general impression of how the program is encoded.)
 
 Since that first instruction took three bytes, the next (`STORE_NAME`)
 appears at address 3. It also has 0 as its argument, but this time
@@ -201,7 +171,34 @@ the module.
 Zooming back out, what did the compiler do? It converted a tree
 structure into a sequence of instructions to perform the operations in
 the right order. Each subtree of the parse tree turned into a
-subsequence of the instructions.
+subsequence of the instructions. Diagramming the AST together with the
+assembly code shows this correspondence[^2]:
+
+    Module(
+     body=[
+      Assign(
+       value=Str(s='Chrysophylax'),           0 LOAD_CONST      0 ('Chrysophylax')
+       targets=[Name(id='name',ctx=Store())]  3 STORE_NAME      0 (name)
+      ),
+      Expr(
+       value=Call(
+        func=Name(id='print', ctx=Load()),    6 LOAD_NAME       1 (print)
+        args=[
+         Str(s='Hi,'),                        9 LOAD_CONST      1 ('Hi,')
+         Name(id='name', ctx=Load()),        12 LOAD_NAME       0 (name)
+        ]
+       )                                     15 CALL_FUNCTION   2 (2 positional, 0 keyword pair)
+      )                                      18 POP_TOP
+     ]                                       19 LOAD_CONST      2 (None)
+                                             22 RETURN_VALUE
+    )
+
+[^2]: There's no tool to dump the AST and the disassembly together like this.
+
+Many of the nodes in this tree turned into one bytecode instruction
+each, in almost the same order (`Call` precedes its arguments in the
+tree, but `CALL_FUNCTION` follows them). That's a common pattern but
+with plenty of exceptions.
 
 The bytecode we just saw was meant for CPython 3.4, and known to work
 on 3.5; in other versions of Python the bytecode varies, maybe even
@@ -782,10 +779,10 @@ where `POP_JUMP_IF_FALSE` does what it says: pops the value left by
 `ok`, tests it, and if it's false jumps to index 12---that is, makes
 that the next instruction to execute. Otherwise execution continues to
 the usual next instruction, at 6. `JUMP_FORWARD` likewise jumps to
-index 15[^2], to skip `no` if we chose `yes`.
+index 15[^3], to skip `no` if we chose `yes`.
 
 
-[^2]: `POP_TOP` is not part of the code for the `if`
+[^3]: `POP_TOP` is not part of the code for the `if`
 expression itself, it's code for the expression statement containing
 the `if`. It's listed here because the `JUMP_FORWARD` jumps to
 it. Every `if` appears in a context where more bytecode will follow --
@@ -1324,11 +1321,11 @@ the node otherwise unchanged. Desugaring uses such a transformer:
     class Desugarer(ast.NodeTransformer):
 
 For a start, we rewrite statements like `assert cookie, "Want
-cookie!"` into `if not cookie: raise AssertionError("Want cookie!")`[^3].
+cookie!"` into `if not cookie: raise AssertionError("Want cookie!")`[^4].
 (Rather, into an if-then-else with the `raise` in the `else`
 clause: this is slightly simpler.)
 
-[^3]: You might wonder if this is quite correct: what if the code
+[^4]: You might wonder if this is quite correct: what if the code
 being compiled redefines `AssertionError`? But `assert` itself at
 runtime calls whatever `AssertionError` is bound to.
 
