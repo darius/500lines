@@ -646,12 +646,16 @@ assigned to the names `g` and `h`).
 We recursively generate code for the function, the arguments, and the
 keyword arguments (which in turn are built from the keyword name
 `t.arg` and the value expression), then chain them together with
-`CALL_FUNCTION` at the end.
+`CALL_FUNCTION` at the end.[^4] The stack made this code generation
+simple: if instead we'd been assigning values to numbered registers,
+for instance, then we'd have had to keep track of these assignments
+and generate code depending on them.
 
-XXX wasn't I going to say a bit more about how the stack makes code
-generation easy? Also, compact code. This is the kind of basic
-architectural choice this book probably wants analysis of, even though
-it's a human-lifetime-old design and forced on me by the CPython VM.
+[^4]: As a technicality, the `CALL_FUNCTION` instruction's argument is
+a two-byte integer (like all instruction arguments, when present)
+but encoding two individual bytes: the counts of keyword and positional
+arguments. Python's bytecode format does give a way to encode bigger
+numbers, but we punt on them. 
 
 
 ### Statements evaluate expressions
