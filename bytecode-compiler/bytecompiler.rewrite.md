@@ -448,9 +448,10 @@ in a fancier version of the compiler. We'll return here later!)
 
 Our `CodeGen` visitor will have:
 
-- `visit_X` methods that are used to handle each type of AST node.
-- Tables to maintain the traversal state and helper methods to
-  manipulate them
+- Methods to start traversing and to wrap up the completed code object.
+- Tables holding the traversal state.
+- `visit_X` methods for each type of AST node, each returning a code sequence.
+- Helper methods to generate some common code sequences.
 
     # in CodeGen v0+:
     class CodeGen(ast.NodeVisitor):
@@ -511,7 +512,7 @@ the default, `NodeVisitor` superclass implementation of the
 `visit` method: it calls the right `visit_Whatever` method for the
 type of the node visited. 
 
-f `visit_Whatever` is missing, `NodeVisitor.visit` will then call the
+If `visit_Whatever` is missing, `NodeVisitor.visit` will then call the
 template method `generic_visit`.  This should never happen; however,
 we're certainly going to make some mistakes during development. The
 default implementation of `generic_visit` does nothing, which makes it
@@ -520,6 +521,7 @@ ready for yet. So, let's make some noise if this ever happens:
 
         def generic_visit(self, t):
             raise NotImplementedError()
+
 
 ### The state of a traversal
 
