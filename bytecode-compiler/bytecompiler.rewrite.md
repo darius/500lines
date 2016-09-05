@@ -588,9 +588,9 @@ a `ctx` field to distinguish them:
 
     <<generate variable accesses>>
 
-When we get to compiling functions and classes, we'll need fancier
-logic because names will live in different scopes, but for now all
-names are global:
+Later when we compile functions and classes, they'll impose fancier
+logic on loads and stores because names will live in different scopes,
+but for now all names are global:
 
     # in generate variable accesses v0:
         def load(self, name):  return op.LOAD_NAME(self.names[name])
